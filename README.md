@@ -52,10 +52,12 @@ Grid, ou via skill `grid-sharing:grid`). Atualizações seguintes: reenviar o
 mesmo arquivo sobre o `doc_id` existente — arquivos HTML simples têm backup
 automático no servidor.
 
-## As duas fontes de dados (confirmado com dados reais da operação)
+## As três fontes de dados (confirmado com dados reais da operação)
 
-O app entende dois arquivos completamente diferentes, e os junta pela chave
-**ROTAPL = ID Planejado** (ex. `CHP_3`, `AM1_5`):
+O app entende três arquivos completamente diferentes. Os dois primeiros se
+juntam pela chave **ROTAPL = ID Planejado** (ex. `CHP_3`, `AM1_5`); o
+terceiro se junta pelo **número de saca** (`ROTASACA`/`NUMERO_NEX`), que é
+um pool sequencial global do site — não reinicia em 1 por rota.
 
 ### 1. Arquivo de **optimização** (pré-triagem — "Ver layout" / UC)
 
@@ -80,6 +82,42 @@ ROTASACA, ROTASACAPL, VEICULO, EMPRESA, AGENCIA, SERVICO`. Filtra por
 `SERVICO` (default: só `NEX*`, fora `XPT`/`NORMAL`). Uma linha por saca real
 quando `ROTASACA` está preenchido.
 
+### 3. Arquivo de **extração** (o QR físico real — origem confirmada)
+
+Confirmado com o código real (`nex_index.html` + `abastecimento_index.html`
+do Apps Script que está sendo descontinuado): **nenhuma das telas gera QR
+novo.** O QR físico já vem pré-impresso pela plataforma oficial da Mercado
+Livre (`envios.adminml.com/logistics/sorting/containers`), como um JSON
+`{"container_id": ..., "facility_id": "SSC2", "assignment": "..."}`. O
+Apps Script só espelha esse dado (via BigQuery, tab "Extração") ou, como
+fallback manual, lê o PDF oficial com `pdf.js` + `jsQR`.
+
+Optamos pelo caminho BigQuery: a query real é
+
+```sql
+-- meli-bi-data.WHOWNER_FEED.SHIPPING_SORTING_HISTORY, CONTAINER_TYPE IN ('bag','baker_cart')
+-- CONTAINER_QR = TO_JSON_STRING(STRUCT(container_id, facility_id, assignment))
+-- daí extrai SITE, CICLO, ROTA, ROTAOT por JSON_EXTRACT_SCALAR
+```
+
+Colunas relevantes: `SITE, ROTA, CONTAINER_ID, CONTAINER_QR`. Só interessam
+as linhas onde `ROTA` é **puramente numérica** (ex. `"24"`) — são as sacas
+NEX (`assignment` sem `_`, por isso `CICLO` fica vazio na query e o Apps
+Script antigo classificava como NEX). Linhas com `ROTA` tipo `D1_AM1` ou
+`X1_CHP` são racks/carts de rota normal ou CHP, não sacas — se ignoram.
+
+A chave de cruzamento é `ROTA` (desse arquivo) `== ROTASACA` (do arquivo de
+separação/`Q_SEPARACAO`) — o mesmo campo `assignment` do histórico de
+sorting, visto por duas queries diferentes. Uma vez cruzado, `CONTAINER_QR`
+(o JSON completo, verbatim) passa a ser o payload real do QR impresso —
+sem isso, o app usa um payload provisório e marca a etiqueta como tal.
+
+**Limitação conhecida:** a query de extração, do jeito que está, não carrega
+ciclo/data para as sacas NEX (`ROTA` puramente numérica) — então se dois
+ciclos ativos tiverem números de saca sobrepostos ao mesmo tempo no app, o
+cruzamento pode confundir um com o outro. Na prática isso não deveria
+acontecer porque o operador importa os arquivos de um ciclo/lote por vez.
+
 ### Como se combinam
 
 Los dos archivos se pueden importar **en cualquier orden, cuantas veces
@@ -91,9 +129,16 @@ haga falta**, y el merge es por campo (no pisa todo el objeto):
   reales**).
 - El archivo de **separação** sólo escribe `sacas` (reemplaza) y
   `expectedSacas` (al conteo real) **cuando trae `ROTASACA` poblado** para
-  esa ruta; si no lo trae, no toca nada de lo que ya había.
+  esa ruta; si no lo trae, no toca nada de lo que ya había. Al reemplazar,
+  conserva el `realQrPayload` que ya tuviera cada número de saca (no lo pisa
+  con `null`).
+- El archivo de **extração** sólo escribe `realQrPayload`/`containerId` en
+  sacas que ya existen (por `ROTASACA`); si una saca todavía no fue
+  importada por separação, se reporta como "no encontrada" y no crea nada.
 
-Esto está probado con Playwright en ambos órdenes de importación.
+Esto está probado con Playwright en los tres órdenes de importación
+relevantes (incluyendo reimportar separação después de tener el QR real, y
+verificar que sobrevive).
 
 ## Flujo en el app
 
@@ -105,14 +150,18 @@ Esto está probado con Playwright en ambos órdenes de importación.
    `(sugerida)` cuando es heurística, sin sufijo una vez que se corrige a
    mano).
 3. **QR de estação** — genera e imprime una etiqueta con QR por saca, usando
-   `ID Otimizado` como rótulo principal y el código físico real
-   (`ROTASACAPL`) cuando está disponible.
+   `ID Otimizado` como rótulo principal. El QR en sí usa el `CONTAINER_QR`
+   real (del archivo de extração) cuando ya está disponible — marcado
+   "QR real" en verde tanto en la lista de sacas como en la etiqueta. Si
+   todavía no llegó, usa un payload provisorio y lo marca explícitamente en
+   la etiqueta ("no usar en producción") para que no se confunda con uno
+   real.
 
-Formato del payload del QR (provisorio, hasta integrar con el formato real
-de lectura del Nex):
+Formato del payload del QR provisorio (solo mientras no haya `CONTAINER_QR`
+real para esa saca):
 
 ```
-NEX-SSC2|ROTA:<ID_Otimizado_o_pool>|POOL:<ROTAPL>|SACA:<código_físico_o_label>|LOTE:<lote_o_turno>|HIB:<0|1>
+NEX-SSC2-PROVISORIO|ROTA:<ID_Otimizado_o_pool>|POOL:<ROTAPL>|SACA:<código_físico_o_label>|LOTE:<lote_o_turno>|HIB:<0|1>
 ```
 
 ## Próximas fases (placeholders no app)

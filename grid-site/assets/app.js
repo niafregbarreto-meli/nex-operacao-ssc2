@@ -10,10 +10,12 @@
       loteId: '',
       lastOptimizationImport: null, // { fileName, importedAt }
       lastSeparacaoImport: null,    // { fileName, importedAt }
+      lastExtracaoImport: null,     // { fileName, importedAt }
       // route: { key (= ID Planejado / ROTAPL), stationLabel (= ID Otimizado),
       //          detalheRoteiro, veiculoPlanejado, pacotesEstimados, expectedSacas,
       //          hybridExplicit, hybridGuess, hybridManual,
-      //          sacas: [{seq, physicalCode, label, veiculo, empresa, agencia, printedAt}] }
+      //          sacas: [{seq, physicalCode, label, veiculo, empresa, agencia,
+      //                   realQrPayload, containerId, printedAt}] }
       routes: []
     };
   }
@@ -85,6 +87,8 @@
     var upper = headers.map(function (h) { return h.trim().toUpperCase(); });
     var hasOpt = upper.some(function (h) { return h.indexOf('OTIMIZADO') !== -1 || h.indexOf('QUANTIDADE DE SACAS') !== -1 || h.indexOf('TIPOS DE SERVI') !== -1; });
     var hasSep = upper.indexOf('ROTAPL') !== -1 || upper.indexOf('ROTASACA') !== -1;
+    var hasExtracao = upper.indexOf('CONTAINER_QR') !== -1 || upper.indexOf('CONTAINER_ID') !== -1;
+    if (hasExtracao) return 'extracao';
     if (hasSep) return 'separacao';
     if (hasOpt) return 'optimization';
     return 'optimization';
@@ -144,7 +148,12 @@
     veiculo: ['VEICULO', 'VEÍCULO'],
     empresa: ['EMPRESA'],
     agencia: ['AGENCIA', 'AGÊNCIA'],
-    servico: ['SERVICO', 'SERVIÇO']
+    servico: ['SERVICO', 'SERVIÇO'],
+
+    site: ['SITE'],
+    extracaoRota: ['ROTA'],
+    containerId: ['CONTAINER_ID'],
+    containerQr: ['CONTAINER_QR']
   };
 
   function guessColumn(headers, candidates) {
@@ -194,10 +203,13 @@
       '<select id="fileKindSelect">' +
       '<option value="optimization"' + (fileKind === 'optimization' ? ' selected' : '') + '>Optimización (pre-triagem: cantidad de sacas + híbrida)</option>' +
       '<option value="separacao"' + (fileKind === 'separacao' ? ' selected' : '') + '>Separação / Q_SEPARACAO (sorting: sacas reales)</option>' +
+      '<option value="extracao"' + (fileKind === 'extracao' ? ' selected' : '') + '>Extração (QR real de la saca física)</option>' +
       '</select></label>' +
       '</div>';
 
-    var fieldsHtml = fileKind === 'optimization' ? optimizationFieldsHtml(h) : separacaoFieldsHtml(h);
+    var fieldsHtml = fileKind === 'optimization' ? optimizationFieldsHtml(h)
+      : fileKind === 'extracao' ? extracaoFieldsHtml(h)
+      : separacaoFieldsHtml(h);
 
     wrap.innerHTML =
       '<div class="card">' +
@@ -275,6 +287,22 @@
       '</div>';
   }
 
+  function extracaoFieldsHtml(h) {
+    var g = {
+      site: guessColumn(h, COLUMN_CANDIDATES.site),
+      rota: guessColumn(h, COLUMN_CANDIDATES.extracaoRota),
+      containerId: guessColumn(h, COLUMN_CANDIDATES.containerId),
+      containerQr: guessColumn(h, COLUMN_CANDIDATES.containerQr)
+    };
+    return '<p class="muted">Cruza por número de saca: sólo se usan las filas donde ROTA es puramente numérica (sacas NEX) — las filas con letras (rutas/CHP) se ignoran acá.</p>' +
+      '<div class="field-row">' +
+      '<label>Site' + selectHtml('mapSite', h, g.site) + '</label>' +
+      '<label>ROTA — número de saca (obligatoria)' + selectHtml('mapExtracaoRota', h, g.rota) + '</label>' +
+      '<label>CONTAINER_ID' + selectHtml('mapContainerId', h, g.containerId) + '</label>' +
+      '<label>CONTAINER_QR — QR real (obligatoria)' + selectHtml('mapContainerQr', h, g.containerQr) + '</label>' +
+      '</div>';
+  }
+
   function renderServicoFilters() {
     var idx = document.getElementById('mapServico').value;
     var wrap = document.getElementById('servicoFilterWrap');
@@ -328,6 +356,7 @@
     state.loteId = loteId;
 
     if (fileKind === 'optimization') confirmImportOptimization();
+    else if (fileKind === 'extracao') confirmImportExtracao();
     else confirmImportSeparacao();
 
     persist();
@@ -422,6 +451,8 @@
           veiculo: veiculo,
           empresa: empresa,
           agencia: agencia,
+          realQrPayload: null,
+          containerId: null,
           printedAt: null
         });
       }
@@ -438,6 +469,15 @@
       route.hybridGuess = distinctVehicles > 1 || distinctEmpresas > 1 || route.hybridGuess;
 
       if (info.realSacas.length > 0) {
+        // Carry forward any real QR already attached (from an "extração" import) to
+        // the same saca number, so re-importing separação doesn't wipe it out.
+        var previousBySeq = {};
+        route.sacas.forEach(function (s) { if (s.realQrPayload) previousBySeq[s.seq] = s; });
+        info.realSacas.forEach(function (s) {
+          var prev = previousBySeq[s.seq];
+          if (prev) { s.realQrPayload = prev.realQrPayload; s.containerId = prev.containerId; }
+        });
+
         route.sacas = info.realSacas;
         route.expectedSacas = info.realSacas.length;
         if (isNew) newCount++; else updatedCount++;
@@ -450,6 +490,44 @@
     var msg = order.length + ' rutas en el archivo — ' + newCount + ' nuevas, ' + updatedCount + ' actualizadas con sacas reales, ' + unchangedCount + ' sin cambios.';
     if (skippedByServico) msg += ' (' + skippedByServico + ' filas ignoradas por Serviço)';
     alertBox('importAlert', msg, 'success');
+  }
+
+  function confirmImportExtracao() {
+    var idxRota = val('mapExtracaoRota');
+    var idxContainerId = val('mapContainerId');
+    var idxContainerQr = val('mapContainerQr');
+
+    if (idxRota === -1 || idxContainerQr === -1) {
+      alertBox('importAlert', 'Elegí las columnas ROTA y CONTAINER_QR.', 'danger');
+      return;
+    }
+
+    // Index every known saca by its sequence number across all routes — NUMERO_NEX
+    // is a global pool for the whole site/cycle, not per-route.
+    var sacaBySeq = {};
+    state.routes.forEach(function (route) {
+      route.sacas.forEach(function (s) { sacaBySeq[s.seq] = s; });
+    });
+
+    var matched = 0, skippedNonNumeric = 0, unmatched = 0;
+    parsedRows.rows.forEach(function (r) {
+      var rota = (r[idxRota] || '').trim();
+      if (!/^\d+$/.test(rota)) { skippedNonNumeric++; return; }
+      var seq = parseInt(rota, 10);
+      var qr = (r[idxContainerQr] || '').trim();
+      if (!qr) return;
+      var saca = sacaBySeq[seq];
+      if (!saca) { unmatched++; return; }
+      saca.realQrPayload = qr;
+      saca.containerId = idxContainerId !== -1 ? (r[idxContainerId] || '').trim() : saca.containerId;
+      matched++;
+    });
+
+    state.lastExtracaoImport = { fileName: parsedRows.fileName, importedAt: new Date().toISOString() };
+    var msg = matched + ' sacas con QR real cargado.';
+    if (unmatched) msg += ' ' + unmatched + ' números de saca no encontrados en las rutas ya importadas (¿faltó importar la separação primero?).';
+    if (skippedNonNumeric) msg += ' (' + skippedNonNumeric + ' filas de rutas/CHP ignoradas)';
+    alertBox('importAlert', msg, matched > 0 ? 'success' : 'danger');
   }
 
   // ---------- assignment screen ----------
@@ -480,8 +558,11 @@
 
     wrap.innerHTML = state.routes.map(function (route, rIdx) {
       var chips = route.sacas.map(function (s, sIdx) {
+        var qrBadge = s.realQrPayload
+          ? ' <span class="badge" style="background:var(--success-bg);color:var(--success)" title="QR real de la extração">QR real</span>'
+          : ' <span class="badge" title="Todavía no llegó el QR real de la extração">provisório</span>';
         return '<span class="saca-chip' + (s.printedAt ? ' printed' : '') + '">' +
-          'Saca ' + escapeHtml(s.label) + (s.veiculo ? ' · ' + escapeHtml(s.veiculo) : '') +
+          'Saca ' + escapeHtml(s.label) + (s.veiculo ? ' · ' + escapeHtml(s.veiculo) : '') + qrBadge +
           '<button data-route="' + rIdx + '" data-saca="' + sIdx + '" class="removeSacaBtn" title="Quitar">&times;</button>' +
           '</span>';
       }).join('');
@@ -537,7 +618,7 @@
         var route = state.routes[rIdx];
         route.sacas = [];
         for (var i = 1; i <= route.expectedSacas; i++) {
-          route.sacas.push({ seq: i, physicalCode: null, label: String(i), veiculo: '', empresa: '', agencia: '', printedAt: null });
+          route.sacas.push({ seq: i, physicalCode: null, label: String(i), veiculo: '', empresa: '', agencia: '', realQrPayload: null, containerId: null, printedAt: null });
         }
         persist();
         renderAssign();
@@ -556,7 +637,7 @@
 
   function addSaca(routeIdx, label) {
     var route = state.routes[routeIdx];
-    route.sacas.push({ seq: route.sacas.length + 1, physicalCode: null, label: label, veiculo: '', empresa: '', agencia: '', printedAt: null });
+    route.sacas.push({ seq: route.sacas.length + 1, physicalCode: null, label: label, veiculo: '', empresa: '', agencia: '', realQrPayload: null, containerId: null, printedAt: null });
     persist();
     renderAssign();
   }
@@ -564,8 +645,12 @@
   // ---------- QR / print screen ----------
 
   function qrPayloadFor(route, saca) {
+    // Real payload wins: it's the exact JSON the official MELI system already
+    // printed on the physical bag (from the "extração" import). Only fall back
+    // to a placeholder when that hasn't arrived yet for this saca.
+    if (saca.realQrPayload) return saca.realQrPayload;
     return [
-      'NEX-SSC2',
+      'NEX-SSC2-PROVISORIO',
       'ROTA:' + routeDisplayName(route),
       'POOL:' + route.key,
       'SACA:' + saca.label,
@@ -599,7 +684,10 @@
         '<div class="saca-seq">SACA ' + escapeHtml(item.saca.label) + '</div>' +
         '<div class="qr-holder"></div>' +
         (item.saca.veiculo ? '<div class="lote">' + escapeHtml(item.saca.veiculo) + '</div>' : '') +
-        '<div class="lote">Lote ' + escapeHtml(state.loteId || '') + '</div>';
+        '<div class="lote">Lote ' + escapeHtml(state.loteId || '') + '</div>' +
+        (item.saca.realQrPayload
+          ? '<div class="lote" style="color:var(--success)">QR real</div>'
+          : '<div class="lote" style="color:var(--warning)">QR provisório — no usar en producción</div>');
       grid.appendChild(card);
 
       var qr = window.qrcode(0, 'M');
