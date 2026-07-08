@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var SCHEMA_VERSION = 1;
+  var SCHEMA_VERSION = 2;
 
   function defaultState() {
     return {
@@ -10,15 +10,16 @@
       batch: {
         fileName: null,
         loteId: '',
-        importedAt: null,
-        mode: null, // 'grouped' | 'expanded'
+        importedAt: null
       },
-      routes: [] // { id, expectedSacas, isHybrid, sacas: [{seq, label, printedAt}] }
+      // route: { key, rotapl, rotaot, rota, expectedSacas, hybridGuess, hybridManual,
+      //          sacas: [{seq, physicalCode, label, veiculo, empresa, agencia, printedAt}] }
+      routes: []
     };
   }
 
   var state = defaultState();
-  var parsedRows = null; // last parsed CSV: { headers: [...], rows: [[...], ...] }
+  var parsedRows = null; // last parsed file: { headers: [...], rows: [[...], ...], fileName }
 
   // ---------- persistence ----------
 
@@ -99,13 +100,50 @@
     var el = document.getElementById(id);
     if (!el) return;
     el.textContent = message;
-    el.className = 'card ' + (kind === 'danger' ? 'danger' : 'muted');
     el.style.display = message ? 'block' : 'none';
+    el.style.background = '';
+    el.style.color = '';
+    el.style.borderColor = '';
     if (kind === 'danger') {
       el.style.background = 'var(--danger-bg)';
       el.style.color = 'var(--danger)';
       el.style.borderColor = 'var(--danger)';
+    } else if (kind === 'success') {
+      el.style.background = 'var(--success-bg)';
+      el.style.color = 'var(--success)';
+      el.style.borderColor = 'var(--success)';
     }
+  }
+
+  // Column auto-detection: matches real export headers (ROTAPL, ROTASACA, ROTASACAPL, SERVICO, ...)
+  // seen in the SSC2 BigQuery-backed sheet, with sensible fallbacks for other layouts.
+  var COLUMN_CANDIDATES = {
+    route: ['ROTACOMPLETA', 'ROTAOT', 'ROTA'],
+    rotapl: ['ROTAPL'],
+    rotaot: ['ROTAOT'],
+    rota: ['ROTA'],
+    sacaSeq: ['ROTASACA'],
+    sacaCode: ['ROTASACAPL'],
+    veiculo: ['VEICULO', 'VEÍCULO'],
+    empresa: ['EMPRESA'],
+    agencia: ['AGENCIA', 'AGÊNCIA'],
+    servico: ['SERVICO', 'SERVIÇO'],
+    qty: ['QTD_SACAS', 'QUANTIDADE_SACAS', 'QTDSACAS', 'QUANTIDADE'],
+    hybrid: ['HIBRIDA', 'HÍBRIDA', 'HIBRIDO', 'HÍBRIDO']
+  };
+
+  function guessColumn(headers, candidates) {
+    var upper = headers.map(function (h) { return h.trim().toUpperCase(); });
+    for (var c = 0; c < candidates.length; c++) {
+      var idx = upper.indexOf(candidates[c]);
+      if (idx !== -1) return idx;
+    }
+    for (var c2 = 0; c2 < candidates.length; c2++) {
+      for (var i = 0; i < upper.length; i++) {
+        if (upper[i].indexOf(candidates[c2]) !== -1) return i;
+      }
+    }
+    return -1;
   }
 
   function isTruthyHybrid(value) {
@@ -115,38 +153,90 @@
 
   // ---------- import mapping screen ----------
 
+  function selectHtml(id, headers, selectedIdx) {
+    var opts = ['<option value="">— no usar —</option>'].concat(
+      headers.map(function (h, idx) {
+        return '<option value="' + idx + '"' + (idx === selectedIdx ? ' selected' : '') + '>' + escapeHtml(h) + '</option>';
+      })
+    ).join('');
+    return '<select id="' + id + '">' + opts + '</select>';
+  }
+
   function renderMapping() {
     var wrap = document.getElementById('mappingWrap');
     if (!parsedRows) { wrap.innerHTML = ''; return; }
+    var h = parsedRows.headers;
 
-    var opts = ['<option value="">— no usar —</option>'].concat(
-      parsedRows.headers.map(function (h, idx) {
-        return '<option value="' + idx + '">' + escapeHtml(h) + '</option>';
-      })
-    ).join('');
+    var g = {
+      route: guessColumn(h, COLUMN_CANDIDATES.route),
+      rotapl: guessColumn(h, COLUMN_CANDIDATES.rotapl),
+      sacaSeq: guessColumn(h, COLUMN_CANDIDATES.sacaSeq),
+      sacaCode: guessColumn(h, COLUMN_CANDIDATES.sacaCode),
+      veiculo: guessColumn(h, COLUMN_CANDIDATES.veiculo),
+      empresa: guessColumn(h, COLUMN_CANDIDATES.empresa),
+      agencia: guessColumn(h, COLUMN_CANDIDATES.agencia),
+      servico: guessColumn(h, COLUMN_CANDIDATES.servico),
+      qty: guessColumn(h, COLUMN_CANDIDATES.qty),
+      hybrid: guessColumn(h, COLUMN_CANDIDATES.hybrid)
+    };
 
     wrap.innerHTML =
       '<div class="card">' +
       '<h2>2. Mapear columnas — ' + escapeHtml(parsedRows.fileName) + ' (' + parsedRows.rows.length + ' filas)</h2>' +
+      '<p class="muted">Detectamos las columnas automáticamente por nombre. Revisá y ajustá si hace falta.</p>' +
       '<div class="field-row">' +
       '<label>Lote / turno<input type="text" id="loteInput" placeholder="ej. 2026-07-08-T1" value="' + escapeHtml(state.batch.loteId || defaultLoteId()) + '"></label>' +
-      '<label>Columna de ruta (obligatoria)<select id="mapRoute">' + opts + '</select></label>' +
-      '<label>Columna de cantidad de sacas (opcional)<select id="mapQty">' + opts + '</select></label>' +
-      '<label>Columna de híbrida (opcional)<select id="mapHybrid">' + opts + '</select></label>' +
+      '<label>Clave de ruta (obligatoria)' + selectHtml('mapRoute', h, g.route) + '</label>' +
+      '<label>Ruta madre / pool (ROTAPL)' + selectHtml('mapRotapl', h, g.rotapl) + '</label>' +
+      '<label>Nro. de saca (ROTASACA)' + selectHtml('mapSacaSeq', h, g.sacaSeq) + '</label>' +
+      '<label>Código físico de saca (ROTASACAPL)' + selectHtml('mapSacaCode', h, g.sacaCode) + '</label>' +
       '</div>' +
-      '<p class="muted">Si no elegís columna de cantidad, cada fila del archivo se cuenta como una saca de esa ruta.</p>' +
+      '<div class="field-row">' +
+      '<label>Vehículo' + selectHtml('mapVeiculo', h, g.veiculo) + '</label>' +
+      '<label>Empresa' + selectHtml('mapEmpresa', h, g.empresa) + '</label>' +
+      '<label>Agência' + selectHtml('mapAgencia', h, g.agencia) + '</label>' +
+      '<label>Serviço (para filtrar filas Nex)' + selectHtml('mapServico', h, g.servico) + '</label>' +
+      '</div>' +
+      '<div class="field-row">' +
+      '<label>Cantidad de sacas esperada (si no hay ROTASACA todavía)' + selectHtml('mapQty', h, g.qty) + '</label>' +
+      '<label>Híbrida explícita (si el archivo ya la trae)' + selectHtml('mapHybrid', h, g.hybrid) + '</label>' +
+      '</div>' +
+      '<div id="servicoFilterWrap"></div>' +
       '<table class="data-table"><thead><tr>' +
-      parsedRows.headers.map(function (h) { return '<th>' + escapeHtml(h) + '</th>'; }).join('') +
+      h.map(function (hh) { return '<th>' + escapeHtml(hh) + '</th>'; }).join('') +
       '</tr></thead><tbody>' +
       parsedRows.rows.slice(0, 5).map(function (r) {
-        return '<tr>' + parsedRows.headers.map(function (_, i) { return '<td>' + escapeHtml(r[i] || '') + '</td>'; }).join('') + '</tr>';
+        return '<tr>' + h.map(function (_, i) { return '<td>' + escapeHtml(r[i] || '') + '</td>'; }).join('') + '</tr>';
       }).join('') +
       '</tbody></table>' +
       '<p class="muted">Mostrando las primeras 5 filas de ' + parsedRows.rows.length + '.</p>' +
       '<button class="btn" id="confirmImportBtn">Importar rutas</button>' +
       '</div>';
 
+    document.getElementById('mapServico').addEventListener('change', renderServicoFilters);
     document.getElementById('confirmImportBtn').addEventListener('click', confirmImport);
+    renderServicoFilters();
+  }
+
+  function renderServicoFilters() {
+    var idx = document.getElementById('mapServico').value;
+    var wrap = document.getElementById('servicoFilterWrap');
+    if (idx === '') { wrap.innerHTML = ''; return; }
+    idx = parseInt(idx, 10);
+    var uniq = {};
+    parsedRows.rows.forEach(function (r) {
+      var v = (r[idx] || '').trim();
+      if (v) uniq[v] = true;
+    });
+    var values = Object.keys(uniq).sort();
+    if (!values.length) { wrap.innerHTML = ''; return; }
+    wrap.innerHTML = '<p class="muted" style="margin-bottom:4px">¿Qué valores de "Serviço" pertenecen al flujo Nex? (se van a importar solo esas filas)</p>' +
+      '<div class="field-row" style="gap:10px">' +
+      values.map(function (v) {
+        var checked = /NEX/i.test(v) ? ' checked' : '';
+        return '<label style="flex-direction:row; align-items:center; gap:6px"><input type="checkbox" class="servicoCheck" value="' + escapeHtml(v) + '"' + checked + '>' + escapeHtml(v) + '</label>';
+      }).join('') +
+      '</div>';
   }
 
   function defaultLoteId() {
@@ -154,58 +244,135 @@
     return d.toISOString().slice(0, 10);
   }
 
+  function val(id) {
+    var el = document.getElementById(id);
+    var v = el.value;
+    return v === '' ? -1 : parseInt(v, 10);
+  }
+
   function confirmImport() {
-    var routeIdx = document.getElementById('mapRoute').value;
-    var qtyIdx = document.getElementById('mapQty').value;
-    var hybridIdx = document.getElementById('mapHybrid').value;
+    var idxRoute = val('mapRoute');
+    var idxRotapl = val('mapRotapl');
+    var idxSacaSeq = val('mapSacaSeq');
+    var idxSacaCode = val('mapSacaCode');
+    var idxVeiculo = val('mapVeiculo');
+    var idxEmpresa = val('mapEmpresa');
+    var idxAgencia = val('mapAgencia');
+    var idxServico = val('mapServico');
+    var idxQty = val('mapQty');
+    var idxHybrid = val('mapHybrid');
     var loteId = document.getElementById('loteInput').value.trim() || defaultLoteId();
 
-    if (routeIdx === '') {
+    if (idxRoute === -1) {
       alertBox('importAlert', 'Elegí qué columna identifica la ruta.', 'danger');
       return;
     }
 
-    if (state.routes.length > 0) {
-      var ok = window.confirm ?
-        confirm('Ya hay rutas cargadas con asignaciones de sacas. Importar de nuevo va a reemplazar todo. ¿Continuar?') :
-        true;
-      if (!ok) return;
+    var allowedServicos = null;
+    if (idxServico !== -1) {
+      var checks = document.querySelectorAll('.servicoCheck:checked');
+      allowedServicos = {};
+      checks.forEach(function (c) { allowedServicos[c.value] = true; });
     }
 
     var byRoute = {};
     var order = [];
+    var skippedByServico = 0;
+
     parsedRows.rows.forEach(function (r) {
-      var id = (r[routeIdx] || '').trim();
-      if (!id) return;
-      if (!byRoute[id]) { byRoute[id] = { count: 0, hybrid: false }; order.push(id); }
-      if (qtyIdx !== '') {
-        var q = parseInt(r[qtyIdx], 10);
-        byRoute[id].count = isNaN(q) ? byRoute[id].count : Math.max(byRoute[id].count, q);
-      } else {
-        byRoute[id].count += 1;
+      var key = (r[idxRoute] || '').trim();
+      if (!key) return;
+      if (allowedServicos && idxServico !== -1) {
+        var sv = (r[idxServico] || '').trim();
+        if (sv && !allowedServicos[sv]) { skippedByServico++; return; }
       }
-      if (hybridIdx !== '' && isTruthyHybrid(r[hybridIdx])) {
-        byRoute[id].hybrid = true;
+      if (!byRoute[key]) {
+        byRoute[key] = {
+          rotapl: idxRotapl !== -1 ? r[idxRotapl] : '',
+          veiculos: {},
+          empresas: {},
+          qty: null,
+          hybridExplicit: false,
+          realSacas: []
+        };
+        order.push(key);
+      }
+      var info = byRoute[key];
+
+      if (idxQty !== -1) {
+        var q = parseInt(r[idxQty], 10);
+        if (!isNaN(q)) info.qty = Math.max(info.qty || 0, q);
+      }
+      if (idxHybrid !== -1 && isTruthyHybrid(r[idxHybrid])) info.hybridExplicit = true;
+
+      var seqRaw = idxSacaSeq !== -1 ? (r[idxSacaSeq] || '').trim() : '';
+      if (seqRaw !== '') {
+        var veiculo = idxVeiculo !== -1 ? (r[idxVeiculo] || '').trim() : '';
+        var empresa = idxEmpresa !== -1 ? (r[idxEmpresa] || '').trim() : '';
+        var agencia = idxAgencia !== -1 ? (r[idxAgencia] || '').trim() : '';
+        var code = idxSacaCode !== -1 ? (r[idxSacaCode] || '').trim() : '';
+        if (veiculo) info.veiculos[veiculo] = true;
+        if (empresa) info.empresas[empresa] = true;
+        info.realSacas.push({
+          seq: parseInt(seqRaw, 10) || (info.realSacas.length + 1),
+          physicalCode: code || null,
+          label: code || seqRaw,
+          veiculo: veiculo,
+          empresa: empresa,
+          agencia: agencia,
+          printedAt: null
+        });
       }
     });
 
-    state.routes = order.map(function (id) {
-      var info = byRoute[id];
+    order.forEach(function (key) {
+      byRoute[key].realSacas.sort(function (a, b) { return a.seq - b.seq; });
+    });
+
+    var existingByKey = {};
+    state.routes.forEach(function (r) { existingByKey[r.key] = r; });
+
+    var newCount = 0, updatedCount = 0, unchangedCount = 0;
+    var mergedRoutes = order.map(function (key) {
+      var info = byRoute[key];
+      var existing = existingByKey[key];
+      var hasRealSacas = info.realSacas.length > 0;
+      var distinctVehicles = Object.keys(info.veiculos).length;
+      var distinctEmpresas = Object.keys(info.empresas).length;
+      var hybridGuess = info.hybridExplicit || distinctVehicles > 1 || distinctEmpresas > 1;
+
+      if (existing && !hasRealSacas) {
+        existing.expectedSacas = info.qty || existing.expectedSacas;
+        existing.hybridGuess = hybridGuess || existing.hybridGuess;
+        existing.rotapl = info.rotapl || existing.rotapl;
+        unchangedCount++;
+        return existing;
+      }
+
+      if (existing) updatedCount++; else newCount++;
       return {
-        id: id,
-        expectedSacas: info.count || 1,
-        isHybrid: info.hybrid,
-        sacas: []
+        key: key,
+        rotapl: info.rotapl,
+        expectedSacas: hasRealSacas ? info.realSacas.length : (info.qty || null),
+        hybridGuess: hybridGuess,
+        hybridManual: existing ? (existing.hybridManual != null ? existing.hybridManual : null) : null,
+        sacas: hasRealSacas ? info.realSacas : (existing ? existing.sacas : [])
       };
     });
+
+    // keep routes from other imports/batches that this file doesn't mention
+    state.routes.forEach(function (r) { if (!byRoute[r.key]) mergedRoutes.push(r); });
+
+    state.routes = mergedRoutes;
     state.batch = {
       fileName: parsedRows.fileName,
       loteId: loteId,
-      importedAt: new Date().toISOString(),
-      mode: qtyIdx !== '' ? 'grouped' : 'expanded'
+      importedAt: new Date().toISOString()
     };
 
-    alertBox('importAlert', order.length + ' rutas importadas correctamente.', 'success');
+    var msg = order.length + ' rutas en el archivo — ' + newCount + ' nuevas, ' + updatedCount + ' actualizadas con datos reales, ' + unchangedCount + ' sin cambios.';
+    if (skippedByServico) msg += ' (' + skippedByServico + ' filas ignoradas por Serviço)';
+    alertBox('importAlert', msg, 'success');
     persist();
     renderAll();
     switchTab('assign');
@@ -213,32 +380,44 @@
 
   // ---------- assignment screen ----------
 
+  function isHybridEffective(route) {
+    return route.hybridManual != null ? route.hybridManual : !!route.hybridGuess;
+  }
+
   function renderAssign() {
     var wrap = document.getElementById('routesWrap');
     if (!state.routes.length) {
-      wrap.innerHTML = '<div class="placeholder">Todavía no importaste ningún archivo de separación.<br>Andá a la pestaña "Importar" para empezar.</div>';
+      wrap.innerHTML = '<div class="placeholder">Todavía no importaste ningún archivo de separação.<br>Andá a la pestaña "Importar" para empezar.</div>';
       return;
     }
 
     wrap.innerHTML = state.routes.map(function (route, rIdx) {
       var chips = route.sacas.map(function (s, sIdx) {
         return '<span class="saca-chip' + (s.printedAt ? ' printed' : '') + '">' +
-          'Saca ' + escapeHtml(s.label) +
+          'Saca ' + escapeHtml(s.label) + (s.veiculo ? ' · ' + escapeHtml(s.veiculo) : '') +
           '<button data-route="' + rIdx + '" data-saca="' + sIdx + '" class="removeSacaBtn" title="Quitar">&times;</button>' +
           '</span>';
       }).join('');
 
+      var expected = route.expectedSacas;
+      var countLabel = expected ? (route.sacas.length + ' / ' + expected + ' sacas') : (route.sacas.length + ' sacas');
+      var hybrid = isHybridEffective(route);
+
       return '<div class="route-card">' +
         '<div class="route-head">' +
-        '<strong>' + escapeHtml(route.id) + '</strong>' +
-        '<span class="badge route-count">' + route.sacas.length + ' / ' + route.expectedSacas + ' sacas asignadas</span>' +
-        (route.isHybrid ? '<span class="badge">Ruta híbrida</span>' : '') +
+        '<strong>' + escapeHtml(route.key) + '</strong>' +
+        (route.rotapl ? '<span class="muted">pool: ' + escapeHtml(route.rotapl) + '</span>' : '') +
+        '<span class="badge route-count">' + countLabel + '</span>' +
+        '<label style="flex-direction:row; align-items:center; gap:4px; font-size:12px">' +
+        '<input type="checkbox" class="hybridToggle" data-route="' + rIdx + '"' + (hybrid ? ' checked' : '') + '> Híbrida' +
+        (route.hybridManual == null ? ' <span class="muted">(sugerida)</span>' : '') +
+        '</label>' +
         '</div>' +
         '<div class="saca-list">' + chips + '</div>' +
-        '<div style="margin-top:10px; display:flex; gap:8px; align-items:center;">' +
+        '<div style="margin-top:10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap">' +
         '<input type="text" placeholder="Nro/etiqueta de saca" class="newSacaLabel" data-route="' + rIdx + '" style="width:160px">' +
         '<button class="btn secondary addSacaBtn" data-route="' + rIdx + '">+ Agregar saca</button>' +
-        '<button class="btn secondary autoFillBtn" data-route="' + rIdx + '">Autocompletar 1..' + route.expectedSacas + '</button>' +
+        (expected ? '<button class="btn secondary autoFillBtn" data-route="' + rIdx + '">Autocompletar 1..' + expected + '</button>' : '') +
         '</div>' +
         '</div>';
     }).join('');
@@ -269,8 +448,17 @@
         var route = state.routes[rIdx];
         route.sacas = [];
         for (var i = 1; i <= route.expectedSacas; i++) {
-          route.sacas.push({ seq: i, label: String(i), printedAt: null });
+          route.sacas.push({ seq: i, physicalCode: null, label: String(i), veiculo: '', empresa: '', agencia: '', printedAt: null });
         }
+        persist();
+        renderAssign();
+      });
+    });
+
+    wrap.querySelectorAll('.hybridToggle').forEach(function (chk) {
+      chk.addEventListener('change', function () {
+        var rIdx = parseInt(chk.getAttribute('data-route'), 10);
+        state.routes[rIdx].hybridManual = chk.checked;
         persist();
         renderAssign();
       });
@@ -279,7 +467,7 @@
 
   function addSaca(routeIdx, label) {
     var route = state.routes[routeIdx];
-    route.sacas.push({ seq: route.sacas.length + 1, label: label, printedAt: null });
+    route.sacas.push({ seq: route.sacas.length + 1, physicalCode: null, label: label, veiculo: '', empresa: '', agencia: '', printedAt: null });
     persist();
     renderAssign();
   }
@@ -287,7 +475,13 @@
   // ---------- QR / print screen ----------
 
   function qrPayloadFor(route, saca) {
-    return ['NEX-SSC2', 'ROTA:' + route.id, 'SACA:' + saca.label, 'LOTE:' + (state.batch.loteId || ''), 'HIB:' + (route.isHybrid ? 1 : 0)].join('|');
+    return [
+      'NEX-SSC2',
+      'ROTA:' + route.key,
+      'SACA:' + saca.label,
+      'LOTE:' + (state.batch.loteId || ''),
+      'HIB:' + (isHybridEffective(route) ? 1 : 0)
+    ].join('|');
   }
 
   function renderLabels() {
@@ -311,9 +505,10 @@
       card.className = 'label-card';
       var payload = qrPayloadFor(item.route, item.saca);
       card.innerHTML =
-        '<div class="route-id">' + escapeHtml(item.route.id) + (item.route.isHybrid ? ' <span class="badge">HÍB</span>' : '') + '</div>' +
+        '<div class="route-id">' + escapeHtml(item.route.key) + (isHybridEffective(item.route) ? ' <span class="badge">HÍB</span>' : '') + '</div>' +
         '<div class="saca-seq">SACA ' + escapeHtml(item.saca.label) + '</div>' +
         '<div class="qr-holder"></div>' +
+        (item.saca.veiculo ? '<div class="lote">' + escapeHtml(item.saca.veiculo) + '</div>' : '') +
         '<div class="lote">Lote ' + escapeHtml(state.batch.loteId || '') + '</div>';
       grid.appendChild(card);
 
