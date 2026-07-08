@@ -1,12 +1,15 @@
 /*
  * Persistence adapter: uses the Grid HTML SDK collaborative state when the app
- * runs inside a Grid document viewer, and falls back to localStorage when
- * opened directly in a browser (local development / preview outside Grid).
+ * runs inside a Grid document viewer. Grid's upload validation rejects any
+ * HTML that references browser storage APIs, so local preview (outside
+ * Grid) falls back to a plain in-memory variable instead — it won't survive
+ * a reload, but it keeps the app usable for local testing without risking
+ * an upload rejection.
  */
 (function (global) {
-  var LOCAL_KEY = 'nex_presorting_state_v1';
   var saveTimer = null;
   var pendingState = null;
+  var memoryFallback = null;
 
   function hasGridState() {
     return !!(global.GRID && global.GRID.state && typeof global.GRID.state.get === 'function');
@@ -23,12 +26,7 @@
           return null;
         }
       }
-      try {
-        var raw = localStorage.getItem(LOCAL_KEY);
-        return raw ? JSON.parse(raw) : null;
-      } catch (err) {
-        return null;
-      }
+      return memoryFallback;
     },
 
     // Debounced write so rapid edits (typing, checkbox toggles) coalesce into
@@ -50,11 +48,7 @@
         }
         return;
       }
-      try {
-        localStorage.setItem(LOCAL_KEY, JSON.stringify(state));
-      } catch (err) {
-        console.error('localStorage save failed', err);
-      }
+      memoryFallback = state;
     },
 
     isRunningInGrid() {

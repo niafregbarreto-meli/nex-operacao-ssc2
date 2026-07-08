@@ -1,18 +1,18 @@
 (function () {
   'use strict';
 
-  var SCHEMA_VERSION = 2;
+  var SCHEMA_VERSION = 3;
 
   function defaultState() {
     return {
       schemaVersion: SCHEMA_VERSION,
       updatedAt: null,
-      batch: {
-        fileName: null,
-        loteId: '',
-        importedAt: null
-      },
-      // route: { key, rotapl, rotaot, rota, expectedSacas, hybridGuess, hybridManual,
+      loteId: '',
+      lastOptimizationImport: null, // { fileName, importedAt }
+      lastSeparacaoImport: null,    // { fileName, importedAt }
+      // route: { key (= ID Planejado / ROTAPL), stationLabel (= ID Otimizado),
+      //          detalheRoteiro, veiculoPlanejado, pacotesEstimados, expectedSacas,
+      //          hybridExplicit, hybridGuess, hybridManual,
       //          sacas: [{seq, physicalCode, label, veiculo, empresa, agencia, printedAt}] }
       routes: []
     };
@@ -20,6 +20,7 @@
 
   var state = defaultState();
   var parsedRows = null; // last parsed file: { headers: [...], rows: [[...], ...], fileName }
+  var fileKind = null;   // 'optimization' | 'separacao'
 
   // ---------- persistence ----------
 
@@ -38,7 +39,7 @@
       badge.textContent = 'Guardado en Grid';
       badge.classList.remove('local');
     } else {
-      badge.textContent = 'Modo local (fuera de Grid)';
+      badge.textContent = 'Modo local (sin persistencia)';
       badge.classList.add('local');
     }
     renderAll();
@@ -48,7 +49,10 @@
 
   function parseDelimited(text) {
     var firstLine = (text.split(/\r\n|\n/, 1)[0] || '');
-    var delimiter = (firstLine.split(';').length > firstLine.split(',').length) ? ';' : ',';
+    var candidates = [',', ';', '\t'];
+    var delimiter = candidates.reduce(function (best, d) {
+      return firstLine.split(d).length > firstLine.split(best).length ? d : best;
+    }, ',');
     var rows = [];
     var row = [];
     var field = '';
@@ -77,6 +81,15 @@
     return rows;
   }
 
+  function detectFileKind(headers) {
+    var upper = headers.map(function (h) { return h.trim().toUpperCase(); });
+    var hasOpt = upper.some(function (h) { return h.indexOf('OTIMIZADO') !== -1 || h.indexOf('QUANTIDADE DE SACAS') !== -1 || h.indexOf('TIPOS DE SERVI') !== -1; });
+    var hasSep = upper.indexOf('ROTAPL') !== -1 || upper.indexOf('ROTASACA') !== -1;
+    if (hasSep) return 'separacao';
+    if (hasOpt) return 'optimization';
+    return 'optimization';
+  }
+
   function handleFileSelect(file) {
     var reader = new FileReader();
     reader.onload = function (e) {
@@ -88,6 +101,7 @@
       var headers = rows[0].map(function (h) { return h.trim(); });
       var dataRows = rows.slice(1).filter(function (r) { return r.some(function (v) { return v.trim() !== ''; }); });
       parsedRows = { headers: headers, rows: dataRows, fileName: file.name };
+      fileKind = detectFileKind(headers);
       renderMapping();
     };
     reader.onerror = function () {
@@ -115,21 +129,22 @@
     }
   }
 
-  // Column auto-detection: matches real export headers (ROTAPL, ROTASACA, ROTASACAPL, SERVICO, ...)
-  // seen in the SSC2 BigQuery-backed sheet, with sensible fallbacks for other layouts.
   var COLUMN_CANDIDATES = {
-    route: ['ROTACOMPLETA', 'ROTAOT', 'ROTA'],
+    idPlanejado: ['ID PLANEJADO'],
+    idOtimizado: ['ID OTIMIZADO'],
+    detalhe: ['DETALHE DO ROTEIRO'],
+    tipoServico: ['TIPOS DE SERVIÇOS', 'TIPOS DE SERVICOS'],
+    qtdSacas: ['QUANTIDADE DE SACAS'],
+    tipoVeiculo: ['TIPO DE VEÍCULO', 'TIPO DE VEICULO'],
+    pacotesEstimados: ['PACOTES ESTIMADOS'],
+
     rotapl: ['ROTAPL'],
-    rotaot: ['ROTAOT'],
-    rota: ['ROTA'],
     sacaSeq: ['ROTASACA'],
     sacaCode: ['ROTASACAPL'],
     veiculo: ['VEICULO', 'VEÍCULO'],
     empresa: ['EMPRESA'],
     agencia: ['AGENCIA', 'AGÊNCIA'],
-    servico: ['SERVICO', 'SERVIÇO'],
-    qty: ['QTD_SACAS', 'QUANTIDADE_SACAS', 'QTDSACAS', 'QUANTIDADE'],
-    hybrid: ['HIBRIDA', 'HÍBRIDA', 'HIBRIDO', 'HÍBRIDO']
+    servico: ['SERVICO', 'SERVIÇO']
   };
 
   function guessColumn(headers, candidates) {
@@ -146,9 +161,9 @@
     return -1;
   }
 
-  function isTruthyHybrid(value) {
+  function isHybridToken(value) {
     var v = String(value || '').trim().toUpperCase();
-    return ['SIM', 'S', 'Y', 'YES', 'HIBRIDA', 'HÍBRIDA', 'HIBRIDO', 'HÍBRIDO', '1', 'TRUE', 'X'].indexOf(v) !== -1;
+    return ['HYBRID', 'HIBRIDA', 'HÍBRIDA', 'HIBRIDO', 'HÍBRIDO', 'SIM', 'S', 'Y', 'YES', '1', 'TRUE', 'X'].indexOf(v) !== -1;
   }
 
   // ---------- import mapping screen ----------
@@ -162,45 +177,34 @@
     return '<select id="' + id + '">' + opts + '</select>';
   }
 
+  function defaultLoteId() {
+    var d = new Date();
+    return d.toISOString().slice(0, 10);
+  }
+
   function renderMapping() {
     var wrap = document.getElementById('mappingWrap');
     if (!parsedRows) { wrap.innerHTML = ''; return; }
     var h = parsedRows.headers;
 
-    var g = {
-      route: guessColumn(h, COLUMN_CANDIDATES.route),
-      rotapl: guessColumn(h, COLUMN_CANDIDATES.rotapl),
-      sacaSeq: guessColumn(h, COLUMN_CANDIDATES.sacaSeq),
-      sacaCode: guessColumn(h, COLUMN_CANDIDATES.sacaCode),
-      veiculo: guessColumn(h, COLUMN_CANDIDATES.veiculo),
-      empresa: guessColumn(h, COLUMN_CANDIDATES.empresa),
-      agencia: guessColumn(h, COLUMN_CANDIDATES.agencia),
-      servico: guessColumn(h, COLUMN_CANDIDATES.servico),
-      qty: guessColumn(h, COLUMN_CANDIDATES.qty),
-      hybrid: guessColumn(h, COLUMN_CANDIDATES.hybrid)
-    };
+    var kindPicker =
+      '<div class="field-row">' +
+      '<label>Lote / turno<input type="text" id="loteInput" value="' + escapeHtml(state.loteId || defaultLoteId()) + '"></label>' +
+      '<label>Tipo de archivo' +
+      '<select id="fileKindSelect">' +
+      '<option value="optimization"' + (fileKind === 'optimization' ? ' selected' : '') + '>Optimización (pre-triagem: cantidad de sacas + híbrida)</option>' +
+      '<option value="separacao"' + (fileKind === 'separacao' ? ' selected' : '') + '>Separação / Q_SEPARACAO (sorting: sacas reales)</option>' +
+      '</select></label>' +
+      '</div>';
+
+    var fieldsHtml = fileKind === 'optimization' ? optimizationFieldsHtml(h) : separacaoFieldsHtml(h);
 
     wrap.innerHTML =
       '<div class="card">' +
       '<h2>2. Mapear columnas — ' + escapeHtml(parsedRows.fileName) + ' (' + parsedRows.rows.length + ' filas)</h2>' +
-      '<p class="muted">Detectamos las columnas automáticamente por nombre. Revisá y ajustá si hace falta.</p>' +
-      '<div class="field-row">' +
-      '<label>Lote / turno<input type="text" id="loteInput" placeholder="ej. 2026-07-08-T1" value="' + escapeHtml(state.batch.loteId || defaultLoteId()) + '"></label>' +
-      '<label>Clave de ruta (obligatoria)' + selectHtml('mapRoute', h, g.route) + '</label>' +
-      '<label>Ruta madre / pool (ROTAPL)' + selectHtml('mapRotapl', h, g.rotapl) + '</label>' +
-      '<label>Nro. de saca (ROTASACA)' + selectHtml('mapSacaSeq', h, g.sacaSeq) + '</label>' +
-      '<label>Código físico de saca (ROTASACAPL)' + selectHtml('mapSacaCode', h, g.sacaCode) + '</label>' +
-      '</div>' +
-      '<div class="field-row">' +
-      '<label>Vehículo' + selectHtml('mapVeiculo', h, g.veiculo) + '</label>' +
-      '<label>Empresa' + selectHtml('mapEmpresa', h, g.empresa) + '</label>' +
-      '<label>Agência' + selectHtml('mapAgencia', h, g.agencia) + '</label>' +
-      '<label>Serviço (para filtrar filas Nex)' + selectHtml('mapServico', h, g.servico) + '</label>' +
-      '</div>' +
-      '<div class="field-row">' +
-      '<label>Cantidad de sacas esperada (si no hay ROTASACA todavía)' + selectHtml('mapQty', h, g.qty) + '</label>' +
-      '<label>Híbrida explícita (si el archivo ya la trae)' + selectHtml('mapHybrid', h, g.hybrid) + '</label>' +
-      '</div>' +
+      '<p class="muted">Detectamos el tipo de archivo y las columnas automáticamente. Revisá y ajustá si hace falta.</p>' +
+      kindPicker +
+      '<div id="kindFieldsWrap">' + fieldsHtml + '</div>' +
       '<div id="servicoFilterWrap"></div>' +
       '<table class="data-table"><thead><tr>' +
       h.map(function (hh) { return '<th>' + escapeHtml(hh) + '</th>'; }).join('') +
@@ -213,9 +217,62 @@
       '<button class="btn" id="confirmImportBtn">Importar rutas</button>' +
       '</div>';
 
-    document.getElementById('mapServico').addEventListener('change', renderServicoFilters);
+    document.getElementById('fileKindSelect').addEventListener('change', function () {
+      fileKind = this.value;
+      renderMapping();
+    });
     document.getElementById('confirmImportBtn').addEventListener('click', confirmImport);
-    renderServicoFilters();
+
+    if (fileKind === 'separacao') {
+      document.getElementById('mapServico').addEventListener('change', renderServicoFilters);
+      renderServicoFilters();
+    }
+  }
+
+  function optimizationFieldsHtml(h) {
+    var g = {
+      idPlanejado: guessColumn(h, COLUMN_CANDIDATES.idPlanejado),
+      idOtimizado: guessColumn(h, COLUMN_CANDIDATES.idOtimizado),
+      detalhe: guessColumn(h, COLUMN_CANDIDATES.detalhe),
+      tipoServico: guessColumn(h, COLUMN_CANDIDATES.tipoServico),
+      qtdSacas: guessColumn(h, COLUMN_CANDIDATES.qtdSacas),
+      tipoVeiculo: guessColumn(h, COLUMN_CANDIDATES.tipoVeiculo),
+      pacotesEstimados: guessColumn(h, COLUMN_CANDIDATES.pacotesEstimados)
+    };
+    return '<div class="field-row">' +
+      '<label>ID Planejado — clave de ruta (obligatoria)' + selectHtml('mapIdPlanejado', h, g.idPlanejado) + '</label>' +
+      '<label>ID Otimizado — etiqueta de estación' + selectHtml('mapIdOtimizado', h, g.idOtimizado) + '</label>' +
+      '<label>Detalhe do roteiro' + selectHtml('mapDetalhe', h, g.detalhe) + '</label>' +
+      '</div>' +
+      '<div class="field-row">' +
+      '<label>Tipos de serviços (híbrida)' + selectHtml('mapTipoServico', h, g.tipoServico) + '</label>' +
+      '<label>Quantidade de sacas' + selectHtml('mapQtdSacas', h, g.qtdSacas) + '</label>' +
+      '<label>Tipo de veículo' + selectHtml('mapTipoVeiculo', h, g.tipoVeiculo) + '</label>' +
+      '<label>Pacotes estimados' + selectHtml('mapPacotesEstimados', h, g.pacotesEstimados) + '</label>' +
+      '</div>';
+  }
+
+  function separacaoFieldsHtml(h) {
+    var g = {
+      rotapl: guessColumn(h, COLUMN_CANDIDATES.rotapl),
+      sacaSeq: guessColumn(h, COLUMN_CANDIDATES.sacaSeq),
+      sacaCode: guessColumn(h, COLUMN_CANDIDATES.sacaCode),
+      veiculo: guessColumn(h, COLUMN_CANDIDATES.veiculo),
+      empresa: guessColumn(h, COLUMN_CANDIDATES.empresa),
+      agencia: guessColumn(h, COLUMN_CANDIDATES.agencia),
+      servico: guessColumn(h, COLUMN_CANDIDATES.servico)
+    };
+    return '<div class="field-row">' +
+      '<label>ROTAPL — clave de ruta (obligatoria)' + selectHtml('mapRotapl', h, g.rotapl) + '</label>' +
+      '<label>ROTASACA — nro. de saca' + selectHtml('mapSacaSeq', h, g.sacaSeq) + '</label>' +
+      '<label>ROTASACAPL — código físico' + selectHtml('mapSacaCode', h, g.sacaCode) + '</label>' +
+      '</div>' +
+      '<div class="field-row">' +
+      '<label>Vehículo' + selectHtml('mapVeiculo', h, g.veiculo) + '</label>' +
+      '<label>Empresa' + selectHtml('mapEmpresa', h, g.empresa) + '</label>' +
+      '<label>Agência' + selectHtml('mapAgencia', h, g.agencia) + '</label>' +
+      '<label>Serviço (para filtrar filas Nex)' + selectHtml('mapServico', h, g.servico) + '</label>' +
+      '</div>';
   }
 
   function renderServicoFilters() {
@@ -239,40 +296,101 @@
       '</div>';
   }
 
-  function defaultLoteId() {
-    var d = new Date();
-    return d.toISOString().slice(0, 10);
-  }
-
   function val(id) {
     var el = document.getElementById(id);
+    if (!el) return -1;
     var v = el.value;
     return v === '' ? -1 : parseInt(v, 10);
   }
 
+  function getOrCreateRoute(key) {
+    for (var i = 0; i < state.routes.length; i++) {
+      if (state.routes[i].key === key) return state.routes[i];
+    }
+    var fresh = {
+      key: key,
+      stationLabel: null,
+      detalheRoteiro: null,
+      veiculoPlanejado: null,
+      pacotesEstimados: null,
+      expectedSacas: null,
+      hybridExplicit: null,
+      hybridGuess: false,
+      hybridManual: null,
+      sacas: []
+    };
+    state.routes.push(fresh);
+    return fresh;
+  }
+
   function confirmImport() {
-    var idxRoute = val('mapRoute');
-    var idxRotapl = val('mapRotapl');
+    var loteId = document.getElementById('loteInput').value.trim() || defaultLoteId();
+    state.loteId = loteId;
+
+    if (fileKind === 'optimization') confirmImportOptimization();
+    else confirmImportSeparacao();
+
+    persist();
+    renderAll();
+    switchTab('assign');
+  }
+
+  function confirmImportOptimization() {
+    var idxKey = val('mapIdPlanejado');
+    var idxLabel = val('mapIdOtimizado');
+    var idxDetalhe = val('mapDetalhe');
+    var idxTipoServico = val('mapTipoServico');
+    var idxQtd = val('mapQtdSacas');
+    var idxVeiculo = val('mapTipoVeiculo');
+    var idxPacotes = val('mapPacotesEstimados');
+
+    if (idxKey === -1) {
+      alertBox('importAlert', 'Elegí la columna "ID Planejado" — es la clave de ruta.', 'danger');
+      return;
+    }
+
+    var count = 0;
+    parsedRows.rows.forEach(function (r) {
+      var key = (r[idxKey] || '').trim();
+      if (!key) return;
+      var route = getOrCreateRoute(key);
+      if (idxLabel !== -1) route.stationLabel = (r[idxLabel] || '').trim() || route.stationLabel;
+      if (idxDetalhe !== -1) route.detalheRoteiro = (r[idxDetalhe] || '').trim() || route.detalheRoteiro;
+      if (idxVeiculo !== -1) route.veiculoPlanejado = (r[idxVeiculo] || '').trim() || route.veiculoPlanejado;
+      if (idxPacotes !== -1) {
+        var pe = parseInt(r[idxPacotes], 10);
+        if (!isNaN(pe)) route.pacotesEstimados = pe;
+      }
+      if (idxTipoServico !== -1) route.hybridExplicit = isHybridToken(r[idxTipoServico]);
+      if (idxQtd !== -1 && route.sacas.length === 0) {
+        var q = parseInt(r[idxQtd], 10);
+        if (!isNaN(q)) route.expectedSacas = q;
+      }
+      count++;
+    });
+
+    state.lastOptimizationImport = { fileName: parsedRows.fileName, importedAt: new Date().toISOString() };
+    alertBox('importAlert', count + ' rutas actualizadas desde el archivo de optimización.', 'success');
+  }
+
+  function confirmImportSeparacao() {
+    var idxRoute = val('mapRotapl');
     var idxSacaSeq = val('mapSacaSeq');
     var idxSacaCode = val('mapSacaCode');
     var idxVeiculo = val('mapVeiculo');
     var idxEmpresa = val('mapEmpresa');
     var idxAgencia = val('mapAgencia');
     var idxServico = val('mapServico');
-    var idxQty = val('mapQty');
-    var idxHybrid = val('mapHybrid');
-    var loteId = document.getElementById('loteInput').value.trim() || defaultLoteId();
 
     if (idxRoute === -1) {
-      alertBox('importAlert', 'Elegí qué columna identifica la ruta.', 'danger');
+      alertBox('importAlert', 'Elegí la columna ROTAPL — es la clave de ruta.', 'danger');
       return;
     }
 
     var allowedServicos = null;
     if (idxServico !== -1) {
-      var checks = document.querySelectorAll('.servicoCheck:checked');
       allowedServicos = {};
-      checks.forEach(function (c) { allowedServicos[c.value] = true; });
+      document.querySelectorAll('.servicoCheck:checked').forEach(function (c) { allowedServicos[c.value] = true; });
     }
 
     var byRoute = {};
@@ -286,24 +404,8 @@
         var sv = (r[idxServico] || '').trim();
         if (sv && !allowedServicos[sv]) { skippedByServico++; return; }
       }
-      if (!byRoute[key]) {
-        byRoute[key] = {
-          rotapl: idxRotapl !== -1 ? r[idxRotapl] : '',
-          veiculos: {},
-          empresas: {},
-          qty: null,
-          hybridExplicit: false,
-          realSacas: []
-        };
-        order.push(key);
-      }
+      if (!byRoute[key]) { byRoute[key] = { veiculos: {}, empresas: {}, realSacas: [] }; order.push(key); }
       var info = byRoute[key];
-
-      if (idxQty !== -1) {
-        var q = parseInt(r[idxQty], 10);
-        if (!isNaN(q)) info.qty = Math.max(info.qty || 0, q);
-      }
-      if (idxHybrid !== -1 && isTruthyHybrid(r[idxHybrid])) info.hybridExplicit = true;
 
       var seqRaw = idxSacaSeq !== -1 ? (r[idxSacaSeq] || '').trim() : '';
       if (seqRaw !== '') {
@@ -325,69 +427,54 @@
       }
     });
 
-    order.forEach(function (key) {
-      byRoute[key].realSacas.sort(function (a, b) { return a.seq - b.seq; });
-    });
-
-    var existingByKey = {};
-    state.routes.forEach(function (r) { existingByKey[r.key] = r; });
-
     var newCount = 0, updatedCount = 0, unchangedCount = 0;
-    var mergedRoutes = order.map(function (key) {
+    order.forEach(function (key) {
       var info = byRoute[key];
-      var existing = existingByKey[key];
-      var hasRealSacas = info.realSacas.length > 0;
+      info.realSacas.sort(function (a, b) { return a.seq - b.seq; });
+      var isNew = !state.routes.some(function (r) { return r.key === key; });
+      var route = getOrCreateRoute(key);
       var distinctVehicles = Object.keys(info.veiculos).length;
       var distinctEmpresas = Object.keys(info.empresas).length;
-      var hybridGuess = info.hybridExplicit || distinctVehicles > 1 || distinctEmpresas > 1;
+      route.hybridGuess = distinctVehicles > 1 || distinctEmpresas > 1 || route.hybridGuess;
 
-      if (existing && !hasRealSacas) {
-        existing.expectedSacas = info.qty || existing.expectedSacas;
-        existing.hybridGuess = hybridGuess || existing.hybridGuess;
-        existing.rotapl = info.rotapl || existing.rotapl;
-        unchangedCount++;
-        return existing;
+      if (info.realSacas.length > 0) {
+        route.sacas = info.realSacas;
+        route.expectedSacas = info.realSacas.length;
+        if (isNew) newCount++; else updatedCount++;
+      } else {
+        if (isNew) newCount++; else unchangedCount++;
       }
-
-      if (existing) updatedCount++; else newCount++;
-      return {
-        key: key,
-        rotapl: info.rotapl,
-        expectedSacas: hasRealSacas ? info.realSacas.length : (info.qty || null),
-        hybridGuess: hybridGuess,
-        hybridManual: existing ? (existing.hybridManual != null ? existing.hybridManual : null) : null,
-        sacas: hasRealSacas ? info.realSacas : (existing ? existing.sacas : [])
-      };
     });
 
-    // keep routes from other imports/batches that this file doesn't mention
-    state.routes.forEach(function (r) { if (!byRoute[r.key]) mergedRoutes.push(r); });
-
-    state.routes = mergedRoutes;
-    state.batch = {
-      fileName: parsedRows.fileName,
-      loteId: loteId,
-      importedAt: new Date().toISOString()
-    };
-
-    var msg = order.length + ' rutas en el archivo — ' + newCount + ' nuevas, ' + updatedCount + ' actualizadas con datos reales, ' + unchangedCount + ' sin cambios.';
+    state.lastSeparacaoImport = { fileName: parsedRows.fileName, importedAt: new Date().toISOString() };
+    var msg = order.length + ' rutas en el archivo — ' + newCount + ' nuevas, ' + updatedCount + ' actualizadas con sacas reales, ' + unchangedCount + ' sin cambios.';
     if (skippedByServico) msg += ' (' + skippedByServico + ' filas ignoradas por Serviço)';
     alertBox('importAlert', msg, 'success');
-    persist();
-    renderAll();
-    switchTab('assign');
   }
 
   // ---------- assignment screen ----------
 
   function isHybridEffective(route) {
-    return route.hybridManual != null ? route.hybridManual : !!route.hybridGuess;
+    if (route.hybridManual != null) return route.hybridManual;
+    if (route.hybridExplicit != null) return route.hybridExplicit;
+    return !!route.hybridGuess;
+  }
+
+  function hybridSourceLabel(route) {
+    if (route.hybridManual != null) return '';
+    if (route.hybridExplicit != null) return ' <span class="muted">(del archivo)</span>';
+    if (route.hybridGuess) return ' <span class="muted">(sugerida)</span>';
+    return '';
+  }
+
+  function routeDisplayName(route) {
+    return route.stationLabel || route.key;
   }
 
   function renderAssign() {
     var wrap = document.getElementById('routesWrap');
     if (!state.routes.length) {
-      wrap.innerHTML = '<div class="placeholder">Todavía no importaste ningún archivo de separação.<br>Andá a la pestaña "Importar" para empezar.</div>';
+      wrap.innerHTML = '<div class="placeholder">Todavía no importaste ningún archivo.<br>Andá a la pestaña "Importar" para empezar.</div>';
       return;
     }
 
@@ -402,17 +489,19 @@
       var expected = route.expectedSacas;
       var countLabel = expected ? (route.sacas.length + ' / ' + expected + ' sacas') : (route.sacas.length + ' sacas');
       var hybrid = isHybridEffective(route);
+      var infoBits = [route.detalheRoteiro, route.veiculoPlanejado, route.pacotesEstimados ? (route.pacotesEstimados + ' pacotes est.') : null].filter(Boolean);
 
       return '<div class="route-card">' +
         '<div class="route-head">' +
-        '<strong>' + escapeHtml(route.key) + '</strong>' +
-        (route.rotapl ? '<span class="muted">pool: ' + escapeHtml(route.rotapl) + '</span>' : '') +
+        '<strong>' + escapeHtml(routeDisplayName(route)) + '</strong>' +
+        '<span class="muted">pool: ' + escapeHtml(route.key) + '</span>' +
         '<span class="badge route-count">' + countLabel + '</span>' +
         '<label style="flex-direction:row; align-items:center; gap:4px; font-size:12px">' +
         '<input type="checkbox" class="hybridToggle" data-route="' + rIdx + '"' + (hybrid ? ' checked' : '') + '> Híbrida' +
-        (route.hybridManual == null ? ' <span class="muted">(sugerida)</span>' : '') +
+        hybridSourceLabel(route) +
         '</label>' +
         '</div>' +
+        (infoBits.length ? '<div class="muted" style="margin-bottom:8px">' + infoBits.map(escapeHtml).join(' · ') + '</div>' : '') +
         '<div class="saca-list">' + chips + '</div>' +
         '<div style="margin-top:10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap">' +
         '<input type="text" placeholder="Nro/etiqueta de saca" class="newSacaLabel" data-route="' + rIdx + '" style="width:160px">' +
@@ -477,9 +566,10 @@
   function qrPayloadFor(route, saca) {
     return [
       'NEX-SSC2',
-      'ROTA:' + route.key,
+      'ROTA:' + routeDisplayName(route),
+      'POOL:' + route.key,
       'SACA:' + saca.label,
-      'LOTE:' + (state.batch.loteId || ''),
+      'LOTE:' + (state.loteId || ''),
       'HIB:' + (isHybridEffective(route) ? 1 : 0)
     ].join('|');
   }
@@ -505,11 +595,11 @@
       card.className = 'label-card';
       var payload = qrPayloadFor(item.route, item.saca);
       card.innerHTML =
-        '<div class="route-id">' + escapeHtml(item.route.key) + (isHybridEffective(item.route) ? ' <span class="badge">HÍB</span>' : '') + '</div>' +
+        '<div class="route-id">' + escapeHtml(routeDisplayName(item.route)) + (isHybridEffective(item.route) ? ' <span class="badge">HÍB</span>' : '') + '</div>' +
         '<div class="saca-seq">SACA ' + escapeHtml(item.saca.label) + '</div>' +
         '<div class="qr-holder"></div>' +
         (item.saca.veiculo ? '<div class="lote">' + escapeHtml(item.saca.veiculo) + '</div>' : '') +
-        '<div class="lote">Lote ' + escapeHtml(state.batch.loteId || '') + '</div>';
+        '<div class="lote">Lote ' + escapeHtml(state.loteId || '') + '</div>';
       grid.appendChild(card);
 
       var qr = window.qrcode(0, 'M');
