@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nex SSC2 — Pré-triagem</title>
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+
+<header class="app-header">
+  <div>
+    <h1>Nex — Operação SSC2 (Biguaçu)</h1>
+    <div class="subtitle">Pré-sorting: separação → sacas → QR de estação</div>
+  </div>
+  <span id="storageBadge" class="storage-badge">—</span>
+</header>
+
+<nav class="tabs">
+  <button data-tab="import" class="active">1. Importar</button>
+  <button data-tab="assign">2. Asignar sacas</button>
+  <button data-tab="qr">3. QR de estação</button>
+  <button data-tab="sorting">4. Sorting</button>
+  <button data-tab="postsorting">5. Post-sorting</button>
+</nav>
+
+<main>
+
+  <section id="screen-import" class="screen active">
+    <div class="card">
+      <h2>1. Subir arquivo de separação</h2>
+      <p class="muted">Subí el CSV exportado del sistema de separación. Va a decirte cuántas sacas tiene cada ruta y cuáles son híbridas.</p>
+      <input type="file" id="fileInput" accept=".csv,text/csv">
+    </div>
+    <div id="importAlert" class="card" style="display:none"></div>
+    <div id="mappingWrap"></div>
+  </section>
+
+  <section id="screen-assign" class="screen">
+    <div class="card">
+      <h2>2. Asignar sacas físicas por ruta</h2>
+      <p class="muted">Cada ruta hija ocupa entre 1 y 6 sacas físicas (a veces más, por excepcionalidad). Agregá o quitá sacas según lo que realmente vas a usar en la estación.</p>
+    </div>
+    <div id="routesWrap"></div>
+  </section>
+
+  <section id="screen-qr" class="screen">
+    <div class="card no-print">
+      <h2>3. QR Codes de estación</h2>
+      <div class="field-row" style="align-items:center">
+        <label>Etiquetas por fila
+          <select id="colsSelect">
+            <option value="2">2</option>
+            <option value="3" selected>3</option>
+            <option value="4">4</option>
+          </select>
+        </label>
+        <button class="btn" id="printBtn">Imprimir</button>
+        <button class="btn secondary" id="markPrintedBtn">Marcar todo como impreso</button>
+      </div>
+    </div>
+    <div id="labelsWrap"></div>
+  </section>
+
+  <section id="screen-sorting" class="screen">
+    <div class="placeholder">
+      <h2>Sorting</h2>
+      <p>Próximamente: acá va a vivir la lógica que, ~1h después de iniciada la triagem, capta qué saca física quedó en cada ruta/estación y permite imprimir el QR final de la saca.</p>
+    </div>
+  </section>
+
+  <section id="screen-postsorting" class="screen">
+    <div class="placeholder">
+      <h2>Post-sorting</h2>
+      <p>Próximamente: revisión/auditoría de la saca y cierre antes del despacho.</p>
+    </div>
+  </section>
+
+</main>
+
+<script src="assets/qrcode.js"></script>
+<script src="assets/grid-shim.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>
