@@ -3,339 +3,460 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Nex SSC2 — Pré-triagem</title>
+<title>GESTÃO NEX — SSC2</title>
 <style>
+/* =========================================================================
+   GESTÃO NEX — SSC2 · Design system inspirado en Andes (Mercado Livre)
+   ========================================================================= */
 :root {
-  --bg: #f4f5f7;
+  --ml-yellow: #ffe600;
+  --ml-yellow-ink: #2d3277;      /* azul tinta ML sobre amarillo */
+  --andes-blue: #3483fa;
+  --andes-blue-dark: #2968c8;
+  --andes-blue-bg: #eef4ff;
+  --bg: #ededed;
   --surface: #ffffff;
-  --border: #d9dce1;
-  --text: #1c1e21;
-  --text-muted: #62676d;
-  --primary: #2563eb;
-  --primary-dark: #1d4ed8;
-  --success: #15803d;
-  --success-bg: #e8f6ec;
-  --warning: #b45309;
-  --warning-bg: #fdf1dd;
-  --danger: #b91c1c;
-  --danger-bg: #fdeaea;
-  --radius: 8px;
+  --surface-2: #f7f8fa;
+  --border: rgba(0, 0, 0, 0.10);
+  --border-strong: rgba(0, 0, 0, 0.18);
+  --text: rgba(0, 0, 0, 0.90);
+  --text-2: rgba(0, 0, 0, 0.55);
+  --text-3: rgba(0, 0, 0, 0.35);
+  --success: #00a650;
+  --success-bg: #e5f5ec;
+  --error: #f23d4f;
+  --error-bg: #fdeaec;
+  --warning: #f5a623;
+  --warning-bg: #fdf3e2;
+  --purple: #8e24aa;
+  --radius: 6px;
+  --radius-lg: 12px;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.12);
+  --shadow-md: 0 6px 16px rgba(0, 0, 0, 0.12);
+  --font: "Proxima Nova", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
 * { box-sizing: border-box; }
 
+html, body { margin: 0; padding: 0; }
+
 body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  font-family: var(--font);
   background: var(--bg);
   color: var(--text);
+  -webkit-font-smoothing: antialiased;
 }
 
-header.app-header {
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  padding: 14px 20px;
+/* ---------- Header ---------- */
+.app-header {
+  background: var(--ml-yellow);
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
+}
+.header-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 10px 20px;
+  gap: 12px;
   flex-wrap: wrap;
-  gap: 8px;
 }
-
-header.app-header h1 {
-  font-size: 18px;
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.brand .logo {
+  width: 34px; height: 34px;
+  border-radius: 8px;
+  background: var(--ml-yellow-ink);
+  color: var(--ml-yellow);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 15px;
+  box-shadow: var(--shadow-sm);
+}
+.brand h1 {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: .3px;
   margin: 0;
+  color: var(--ml-yellow-ink);
 }
-
-header.app-header .subtitle {
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-.storage-badge {
-  font-size: 12px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: var(--success-bg);
-  color: var(--success);
-}
-.storage-badge.local {
-  background: var(--warning-bg);
-  color: var(--warning);
-}
-
-nav.tabs {
-  display: flex;
-  gap: 4px;
-  padding: 0 16px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  overflow-x: auto;
-}
-
-nav.tabs button {
-  border: none;
-  background: none;
-  padding: 12px 16px;
-  font-size: 14px;
-  cursor: pointer;
-  color: var(--text-muted);
-  border-bottom: 3px solid transparent;
-  white-space: nowrap;
-}
-
-nav.tabs button.active {
-  color: var(--primary);
-  border-bottom-color: var(--primary);
-  font-weight: 600;
-}
-
-nav.tabs button:disabled {
-  cursor: default;
-  opacity: 0.5;
-}
-
-main {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 20px 16px 60px;
-}
-
-.screen { display: none; }
-.screen.active { display: block; }
-
-.card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 18px;
-  margin-bottom: 16px;
-}
-
-.card h2 { margin-top: 0; font-size: 16px; }
-.card h3 { font-size: 14px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .03em; }
-
-.muted { color: var(--text-muted); font-size: 13px; }
-
-button.btn {
-  background: var(--primary);
-  color: #fff;
-  border: none;
-  border-radius: var(--radius);
-  padding: 10px 16px;
-  font-size: 14px;
-  cursor: pointer;
-}
-button.btn:hover { background: var(--primary-dark); }
-button.btn.secondary {
-  background: var(--surface);
-  color: var(--primary);
-  border: 1px solid var(--primary);
-}
-button.btn.danger {
-  background: var(--surface);
-  color: var(--danger);
-  border: 1px solid var(--danger);
-}
-button.btn:disabled {
-  background: var(--border);
-  color: var(--text-muted);
-  cursor: not-allowed;
-  border-color: var(--border);
-}
-
-input[type="file"], select, input[type="text"], input[type="number"] {
-  font-size: 14px;
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: #fff;
-}
-
-table.data-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-table.data-table th, table.data-table td {
-  border-bottom: 1px solid var(--border);
-  padding: 8px 10px;
-  text-align: left;
-}
-table.data-table th { color: var(--text-muted); font-weight: 600; }
-
-.field-row {
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-  margin-bottom: 12px;
-}
-.field-row label {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-.badge {
-  display: inline-block;
+.brand .sub {
   font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: var(--warning-bg);
-  color: var(--warning);
-  font-weight: 600;
+  font-weight: 700;
+  color: rgba(45, 50, 119, 0.65);
+  text-transform: uppercase;
+  letter-spacing: .5px;
 }
-.badge.route-count {
-  background: #eef1ff;
-  color: #3730a3;
-}
-
-.route-card {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 14px;
-  margin-bottom: 10px;
-}
-.route-card .route-head {
+.header-right {
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  margin-bottom: 10px;
 }
-.route-card .route-head strong { font-size: 15px; }
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 12px;
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: var(--radius);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ml-yellow-ink);
+  box-shadow: var(--shadow-sm);
+}
+.pill label { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; opacity: .6; }
+.pill select {
+  border: none; background: transparent; font-weight: 800; font-size: 13px;
+  color: var(--ml-yellow-ink); cursor: pointer; outline: none;
+}
+.storage-badge {
+  font-size: 11px; font-weight: 700; padding: 5px 10px; border-radius: 999px;
+  background: var(--success-bg); color: var(--success);
+}
+.storage-badge.local { background: var(--warning-bg); color: var(--warning); }
 
-.saca-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.saca-chip {
+/* ---------- Optimization toolbar (secondary bar) ---------- */
+.header-tools {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  padding: 8px 20px;
+  background: rgba(0, 0, 0, 0.04);
+  flex-wrap: wrap;
+}
+.header-tools .group-label {
+  font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;
+  color: rgba(45, 50, 119, 0.55); margin-right: 2px;
+}
+.tool-link {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 700; color: var(--andes-blue-dark);
+  background: rgba(255, 255, 255, 0.7); border: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 6px 11px; border-radius: var(--radius); cursor: pointer; text-decoration: none;
+  transition: background .12s;
+}
+.tool-link:hover { background: #fff; }
+.tool-link.purple { color: var(--purple); }
+.active-file {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 12px; font-weight: 700; color: var(--ml-yellow-ink);
+  background: rgba(255, 255, 255, 0.8); border: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 5px 8px 5px 11px; border-radius: var(--radius);
+}
+.active-file .x {
+  border: none; background: var(--error-bg); color: var(--error);
+  width: 20px; height: 20px; border-radius: 999px; cursor: pointer; font-weight: 800;
+  display: flex; align-items: center; justify-content: center; line-height: 1;
+}
+
+/* ---------- Buttons ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  height: 40px; padding: 0 18px; border: none; border-radius: var(--radius);
+  font-family: var(--font); font-size: 14px; font-weight: 700; cursor: pointer;
+  transition: background .12s, box-shadow .12s, transform .04s;
+}
+.btn:active { transform: translateY(1px); }
+.btn.loud { background: var(--andes-blue); color: #fff; box-shadow: var(--shadow-sm); }
+.btn.loud:hover { background: var(--andes-blue-dark); }
+.btn.quiet { background: var(--surface); color: var(--andes-blue); border: 1px solid var(--andes-blue); }
+.btn.quiet:hover { background: var(--andes-blue-bg); }
+.btn.ghost { background: transparent; color: var(--andes-blue); }
+.btn.ghost:hover { background: var(--andes-blue-bg); }
+.btn.purple { background: var(--purple); color: #fff; }
+.btn.danger-ghost { background: var(--error-bg); color: var(--error); }
+.btn.warn-ghost { background: var(--warning-bg); color: var(--warning); }
+.btn.sm { height: 32px; padding: 0 12px; font-size: 12px; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+
+/* ---------- Layout ---------- */
+main { max-width: 1160px; margin: 0 auto; padding: 20px 16px 80px; }
+
+.empty-state {
+  background: var(--surface);
+  border: 2px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: 56px 24px;
+  text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+}
+.empty-state svg { width: 60px; height: 60px; color: var(--andes-blue); margin-bottom: 8px; }
+.empty-state .kicker { font-size: 20px; font-weight: 500; color: var(--text); }
+.empty-state h2 { font-size: 30px; font-weight: 800; margin: 0; }
+.empty-state h2 small { font-size: 18px; font-weight: 500; color: var(--text-2); }
+.empty-state .actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 18px; }
+.empty-state p { color: var(--text-2); font-size: 13px; font-weight: 600; margin: 14px 0 0; max-width: 560px; }
+
+/* ---------- Action bar ---------- */
+.toolbar {
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 4px 6px 4px 12px;
-  font-size: 13px;
-  background: #fafbfc;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  border-bottom: none;
+  padding: 12px 14px;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
 }
-.saca-chip button {
-  border: none;
-  background: var(--danger-bg);
-  color: var(--danger);
-  border-radius: 999px;
-  width: 20px;
-  height: 20px;
-  line-height: 1;
-  cursor: pointer;
+.toolbar.second {
+  border-radius: 0;
+  background: var(--surface-2);
+  border-top: 1px solid var(--border);
 }
-.saca-chip.printed { border-color: var(--success); background: var(--success-bg); }
-
-.label-grid {
-  display: grid;
-  grid-template-columns: repeat(var(--cols, 3), 1fr);
-  gap: 12px;
+.search {
+  position: relative; flex: 1 1 240px; max-width: 320px;
 }
-.label-card {
-  border: 1.5px dashed #9aa0a6;
-  border-radius: 6px;
-  padding: 14px;
-  text-align: center;
-  background: #fff;
+.search svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--text-3); }
+.search input {
+  width: 100%; height: 38px; padding: 0 12px 0 34px;
+  border: 1px solid var(--border-strong); border-radius: var(--radius);
+  font-family: var(--font); font-size: 13px; outline: none; text-transform: uppercase;
 }
-.label-card .qr-holder { display: flex; justify-content: center; margin: 8px 0; }
-.label-card .route-id { font-size: 18px; font-weight: 700; }
-.label-card .saca-seq { font-size: 28px; font-weight: 800; color: var(--primary); }
-.label-card .lote { font-size: 11px; color: var(--text-muted); }
-
-.placeholder {
-  text-align: center;
-  padding: 60px 20px;
-  color: var(--text-muted);
+.search input:focus { border-color: var(--andes-blue); }
+.spacer { flex: 1; }
+.count-chip {
+  font-size: 12px; font-weight: 700; color: var(--text-2);
+  background: var(--surface); border: 1px solid var(--border); padding: 8px 12px; border-radius: var(--radius);
+}
+.count-chip b { color: var(--andes-blue); font-weight: 800; }
+.last-save { font-size: 11px; font-weight: 700; color: var(--text-2); }
+select.native {
+  height: 38px; padding: 0 10px; border: 2px solid var(--border-strong);
+  border-radius: var(--radius); font-family: var(--font); font-weight: 700; font-size: 12px;
+  background: var(--surface); cursor: pointer; outline: none;
 }
 
+/* ---------- Route grid ---------- */
+.routes-wrap { background: var(--surface-2); border: 1px solid var(--border); border-top: none;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg); padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+
+.route-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  padding: 16px 16px 18px; box-shadow: var(--shadow-sm);
+}
+.route-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px;
+  border-bottom: 2px solid var(--surface-2); padding-bottom: 10px; }
+.route-head .name { font-size: 17px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase; }
+.route-head .badge {
+  font-size: 11px; font-weight: 700; background: var(--surface-2); color: var(--text-2);
+  padding: 3px 9px; border-radius: 999px;
+}
+.route-head .badge.hyb { background: var(--warning-bg); color: var(--warning); }
+.route-head .badge.full { background: var(--andes-blue-bg); color: var(--andes-blue-dark); }
+.route-head .full-route { font-size: 11px; font-weight: 700; color: var(--text-3); }
+
+.saca-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.saca {
+  position: relative;
+  min-width: 46px; height: 44px; padding: 0 8px;
+  border: 1px solid var(--border-strong); border-radius: var(--radius);
+  background: var(--surface); color: var(--text);
+  font-family: var(--font); font-weight: 800; font-size: 16px;
+  cursor: pointer; transition: all .1s;
+  display: flex; align-items: center; justify-content: center;
+}
+.saca:hover:not(.disabled) { border-color: var(--andes-blue); background: var(--andes-blue-bg); }
+.saca.selected { background: var(--andes-blue); border-color: var(--andes-blue); color: #fff; box-shadow: var(--shadow-sm); }
+.saca.disabled { background: #f0f0f0; border-color: var(--border); color: var(--text-3); cursor: not-allowed; }
+.saca .rm {
+  position: absolute; top: -7px; right: -7px;
+  width: 18px; height: 18px; border-radius: 999px;
+  background: var(--error); color: #fff; border: 2px solid #fff;
+  font-size: 11px; font-weight: 800; line-height: 1; cursor: pointer;
+  display: none; align-items: center; justify-content: center; z-index: 2;
+}
+.saca:hover .rm { display: flex; }
+
+/* ---------- Modal ---------- */
+.overlay {
+  position: fixed; inset: 0; z-index: 70; background: rgba(0, 0, 0, 0.5);
+  display: none; align-items: center; justify-content: center; padding: 16px;
+}
+.overlay.open { display: flex; }
+.modal {
+  background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-md);
+  width: 100%; max-width: 960px; max-height: 88vh; display: flex; flex-direction: column; overflow: hidden;
+}
+.modal.sm { max-width: 420px; }
+.modal-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px;
+  border-bottom: 1px solid var(--border); background: var(--surface-2); }
+.modal-head h2 { font-size: 16px; font-weight: 800; margin: 0; }
+.modal-head .close { border: none; background: transparent; cursor: pointer; color: var(--text-2);
+  width: 32px; height: 32px; border-radius: 999px; font-size: 18px; }
+.modal-head .close:hover { background: var(--error-bg); color: var(--error); }
+.modal-body { overflow: auto; padding: 0; }
+.modal-body.pad { padding: 18px; }
+.modal-foot { padding: 12px 18px; border-top: 1px solid var(--border); background: var(--surface-2);
+  display: flex; gap: 10px; justify-content: flex-end; }
+
+table.data { width: 100%; border-collapse: collapse; font-size: 12px; }
+table.data thead th { position: sticky; top: 0; background: var(--andes-blue); color: #fff;
+  text-align: left; padding: 10px 14px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; white-space: nowrap; }
+table.data td { padding: 9px 14px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+table.data tbody tr:hover { background: var(--andes-blue-bg); }
+
+.field { margin-bottom: 14px; }
+.field label { display: block; font-size: 10px; font-weight: 800; text-transform: uppercase;
+  letter-spacing: 1px; color: var(--andes-blue-dark); margin-bottom: 5px; }
+.field input, .field select {
+  width: 100%; height: 40px; padding: 0 12px; border: 2px solid var(--border-strong);
+  border-radius: var(--radius); font-family: var(--font); font-weight: 700; font-size: 14px; outline: none;
+}
+.field input:focus, .field select:focus { border-color: var(--andes-blue); }
+.hint { font-size: 12px; color: var(--text-2); font-weight: 600; }
+
+/* ---------- Toast ---------- */
+.toast {
+  position: fixed; top: 84px; left: 50%; transform: translateX(-50%) translateY(-8px);
+  padding: 11px 22px; border-radius: var(--radius); color: #fff; font-weight: 800; font-size: 13px;
+  opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; z-index: 200; box-shadow: var(--shadow-md);
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast.ok { background: var(--success); }
+.toast.err { background: var(--error); }
+
+/* ---------- Print ---------- */
+#print-area { display: none; }
 @media print {
-  header.app-header, nav.tabs, .no-print { display: none !important; }
-  main { max-width: none; padding: 0; }
-  .label-card { break-inside: avoid; border-style: solid; }
+  body * { visibility: hidden; }
+  .app-header, main, .toast, .overlay { display: none !important; }
+  #print-area { display: block !important; position: absolute; left: 0; top: 0; width: 100%; visibility: visible; }
+  #print-area * { visibility: visible; }
+
+  .print-page { width: 210mm; height: 297mm; display: flex; justify-content: center; align-items: center;
+    page-break-after: always; }
+  .print-page:last-child { page-break-after: auto; }
+  .print-grid { display: grid; grid-template-columns: 90mm 90mm; grid-template-rows: 130mm 130mm; gap: 10mm; }
+  .card-et { width: 90mm; height: 130mm; display: flex; flex-direction: column; overflow: hidden;
+    border: 4px solid #000; border-radius: 10px; background: #fff; }
+  .card-et.empty { border: none; }
+  .c-num { height: 62mm; display: flex; align-items: center; justify-content: center; border-bottom: 2px solid #000; }
+  .c-num h1 { font: 900 108pt 'Arial Black', Arial, sans-serif; margin: 0; line-height: .8; }
+  .c-route { height: 22mm; display: flex; align-items: center; justify-content: center; border-bottom: 2px solid #000;
+    background: #e5e7eb !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .c-route h2 { font: 900 46pt 'Arial Black', Arial, sans-serif; margin: 0; text-transform: uppercase; }
+  .c-qr { flex: 1; display: flex; align-items: center; justify-content: center; padding: 3mm; }
+  .c-qr svg { width: 42mm; height: 42mm; }
 }
 
 </style>
 </head>
 <body>
 
+<div id="toast" class="toast"></div>
+
 <header class="app-header">
-  <div>
-    <h1>Nex — Operação SSC2 (Biguaçu)</h1>
-    <div class="subtitle">Pré-sorting: separação → sacas → QR de estação</div>
-  </div>
-  <span id="storageBadge" class="storage-badge">—</span>
-</header>
-
-<nav class="tabs">
-  <button data-tab="import" class="active">1. Importar</button>
-  <button data-tab="assign">2. Asignar sacas</button>
-  <button data-tab="qr">3. QR de estação</button>
-  <button data-tab="sorting">4. Sorting</button>
-  <button data-tab="postsorting">5. Post-sorting</button>
-</nav>
-
-<main>
-
-  <section id="screen-import" class="screen active">
-    <div class="card">
-      <h2>1. Subir arquivo de separação</h2>
-      <p class="muted">Subí el CSV exportado del sistema de separación. Va a decirte cuántas sacas tiene cada ruta y cuáles son híbridas.</p>
-      <input type="file" id="fileInput" accept=".csv,text/csv">
-    </div>
-    <div id="importAlert" class="card" style="display:none"></div>
-    <div id="mappingWrap"></div>
-  </section>
-
-  <section id="screen-assign" class="screen">
-    <div class="card">
-      <h2>2. Asignar sacas físicas por ruta</h2>
-      <p class="muted">Cada ruta hija ocupa entre 1 y 6 sacas físicas (a veces más, por excepcionalidad). Agregá o quitá sacas según lo que realmente vas a usar en la estación.</p>
-    </div>
-    <div id="routesWrap"></div>
-  </section>
-
-  <section id="screen-qr" class="screen">
-    <div class="card no-print">
-      <h2>3. QR Codes de estación</h2>
-      <div class="field-row" style="align-items:center">
-        <label>Etiquetas por fila
-          <select id="colsSelect">
-            <option value="2">2</option>
-            <option value="3" selected>3</option>
-            <option value="4">4</option>
-          </select>
-        </label>
-        <button class="btn" id="printBtn">Imprimir</button>
-        <button class="btn secondary" id="markPrintedBtn">Marcar todo como impreso</button>
+  <div class="header-top">
+    <div class="brand">
+      <div class="logo">NEX</div>
+      <div>
+        <h1>GESTÃO NEX</h1>
+        <div class="sub">Operação SSC2 · Biguaçu</div>
       </div>
     </div>
-    <div id="labelsWrap"></div>
-  </section>
-
-  <section id="screen-sorting" class="screen">
-    <div class="placeholder">
-      <h2>Sorting</h2>
-      <p>Próximamente: acá va a vivir la lógica que, ~1h después de iniciada la triagem, capta qué saca física quedó en cada ruta/estación y permite imprimir el QR final de la saca.</p>
+    <div class="header-right">
+      <span class="pill"><label data-i18n="site">Site</label><select id="siteSelect"><option value="SSC2">SSC2</option></select></span>
+      <a class="pill" id="bagsLink" href="https://envios.adminml.com/logistics/sorting/bags" target="_blank" rel="noopener" style="text-decoration:none" data-i18n="avail_bags">Sacas disponíveis ↗</a>
+      <span class="pill"><label>Idioma</label><select id="langSelect"><option value="pt">PT-BR</option><option value="es">ES</option></select></span>
+      <span id="storageBadge" class="storage-badge">—</span>
     </div>
-  </section>
+  </div>
 
-  <section id="screen-postsorting" class="screen">
-    <div class="placeholder">
-      <h2>Post-sorting</h2>
-      <p>Próximamente: revisión/auditoría de la saca y cierre antes del despacho.</p>
+  <div class="header-tools" id="headerTools">
+    <span class="group-label" data-i18n="optimization">Otimização</span>
+    <button class="tool-link" id="btnAnexar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15.17 7l-6.58 6.59a2 2 0 102.82 2.82l6.42-6.58a4 4 0 00-5.66-5.66l-6.41 6.59a6 6 0 108.48 8.48L20.5 13"/></svg><span data-i18n="attach_csv">Anexar CSV</span></button>
+    <button class="tool-link" id="btnExtracao"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7v10c0 2.2 3.58 4 8 4s8-1.8 8-4V7M4 7c0 2.2 3.58 4 8 4s8-1.8 8-4M4 7c0-2.2 3.58-4 8-4s8 1.8 8 4"/></svg><span data-i18n="load_extr">Extração (QR)</span></button>
+    <button class="tool-link" id="btnRecuperar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h5M4 9a8 8 0 113 6"/></svg><span data-i18n="load_saved">Recuperar salvo</span></button>
+
+    <span id="activeFile" class="active-file" style="display:none">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 21h10a2 2 0 002-2V9.41a1 1 0 00-.29-.7l-5.41-5.42A1 1 0 0012.59 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+      <span id="activeFileName">—</span>
+      <button class="x" id="btnLimparOtim" title="Remover">&times;</button>
+    </span>
+
+    <input type="file" id="fileInput" accept=".csv,.tsv,text/csv" style="display:none">
+  </div>
+</header>
+
+<main>
+  <!-- Empty state -->
+  <section id="emptyState" class="empty-state">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.59a1 1 0 01.7.29l5.42 5.42a1 1 0 01.29.7V19a2 2 0 01-2 2z"/></svg>
+    <div class="kicker" data-i18n="import_kicker">Importe o arquivo de</div>
+    <h2><span data-i18n="optimization_up">OTIMIZAÇÃO</span> <small>(CSV)</small></h2>
+    <div class="actions">
+      <button class="btn loud" id="btnAnexar2" data-i18n="attach_csv">Anexar CSV</button>
+      <button class="btn quiet" id="btnRecuperar2" data-i18n="load_saved">Recuperar salvo</button>
+      <button class="btn purple" id="btnExtracao2" data-i18n="load_extr">Extração (QR)</button>
     </div>
+    <p data-i18n="opt_desc">A otimização define quais sacas pertencem a cada rota. A extração traz o QR real de cada saca para impressão.</p>
   </section>
 
+  <!-- Main grid -->
+  <section id="gridWrapper" style="display:none">
+    <div class="toolbar">
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        <input type="text" id="searchInput" placeholder="Buscar rota (ex: G1)…">
+      </div>
+      <button class="btn ghost sm" id="btnSelAll" data-i18n="sel_all">Sel. todos</button>
+      <button class="btn ghost sm" id="btnClearSel" data-i18n="clear_sel">Limpar seleção</button>
+      <button class="btn warn-ghost sm" id="btnRestore" data-i18n="restore">Restaurar excluídas</button>
+      <div class="spacer"></div>
+      <button class="btn purple sm" id="btnVerExtracao" data-i18n="view_extr">Dados extração</button>
+    </div>
+
+    <div class="toolbar second">
+      <button class="btn loud sm" id="btnSalvar" data-i18n="save_choice">Salvar escolha de sacas</button>
+      <span class="last-save" id="lastSave"></span>
+      <div class="spacer"></div>
+      <span class="count-chip"><b id="printCount">0</b> <span data-i18n="copies">cópias</span></span>
+      <select class="native" id="formatSelect">
+        <option value="cartao">CARTÃO (4x1)</option>
+        <option value="folha">FOLHA (1x1)</option>
+      </select>
+      <button class="btn loud sm" id="btnPrint" disabled data-i18n="print">Imprimir</button>
+    </div>
+
+    <div class="routes-wrap" id="routesWrap"></div>
+  </section>
 </main>
+
+<!-- Extraction viewer modal -->
+<div class="overlay" id="extracaoOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 data-i18n="extr_title">Dados da Extração NEX</h2>
+      <button class="close" id="closeExtracao">&times;</button>
+    </div>
+    <div class="modal-body">
+      <table class="data"><thead id="extracaoHead"></thead><tbody id="extracaoBody"></tbody></table>
+    </div>
+    <div class="modal-foot"><span class="hint" id="extracaoFoot"></span></div>
+  </div>
+</div>
+
+<!-- Import mapping modal -->
+<div class="overlay" id="importOverlay">
+  <div class="modal sm">
+    <div class="modal-head">
+      <h2 id="importTitle">Importar</h2>
+      <button class="close" id="closeImport">&times;</button>
+    </div>
+    <div class="modal-body pad" id="importBody"></div>
+    <div class="modal-foot">
+      <button class="btn ghost" id="cancelImport" data-i18n="cancel">Cancelar</button>
+      <button class="btn loud" id="confirmImport" data-i18n="import_btn">Importar</button>
+    </div>
+  </div>
+</div>
+
+<div id="print-area"></div>
 <script>
 //---------------------------------------------------------------------
 //
@@ -2716,751 +2837,453 @@ var qrcode = function() {
 (function () {
   'use strict';
 
-  var SCHEMA_VERSION = 3;
+  var SCHEMA_VERSION = 4;
 
   function defaultState() {
     return {
       schemaVersion: SCHEMA_VERSION,
       updatedAt: null,
-      loteId: '',
-      lastOptimizationImport: null, // { fileName, importedAt }
-      lastSeparacaoImport: null,    // { fileName, importedAt }
-      lastExtracaoImport: null,     // { fileName, importedAt }
-      // route: { key (= ID Planejado / ROTAPL), stationLabel (= ID Otimizado),
-      //          detalheRoteiro, veiculoPlanejado, pacotesEstimados, expectedSacas,
-      //          hybridExplicit, hybridGuess, hybridManual,
-      //          sacas: [{seq, physicalCode, label, veiculo, empresa, agencia,
-      //                   realQrPayload, containerId, printedAt}] }
-      routes: []
+      site: 'SSC2',
+      lang: 'pt',
+      source: null,            // 'opt' | 'extr'
+      optFileName: null,
+      lastSave: null,
+      // groups in file order. { name, fullName, planned, hybrid, count, realSacas: [num] }
+      groups: [],
+      excluded: [],            // global saca numbers hidden by the operator
+      selection: [],           // global saca numbers chosen to print
+      qrByNum: {},             // num -> real CONTAINER_QR string
+      metaByNum: {}            // num -> { agencia, veiculo, rotasacapl }
     };
   }
 
   var state = defaultState();
-  var parsedRows = null; // last parsed file: { headers: [...], rows: [[...], ...], fileName }
-  var fileKind = null;   // 'optimization' | 'separacao'
+  var pending = null;          // { kind, headers, rows, fileName }
 
-  // ---------- persistence ----------
-
-  function persist() {
-    state.updatedAt = new Date().toISOString();
-    window.GridStore.saveDebounced(state, 500);
-  }
-
-  async function init() {
-    var loaded = await window.GridStore.load();
-    if (loaded && loaded.schemaVersion === SCHEMA_VERSION) {
-      state = loaded;
+  // ---------------------------------------------------------------- i18n
+  var I18N = {
+    pt: {
+      site: 'Site', avail_bags: 'Sacas disponíveis ↗', optimization: 'Otimização',
+      attach_csv: 'Anexar CSV', load_extr: 'Extração (QR)', load_saved: 'Recuperar salvo',
+      import_kicker: 'Importe o arquivo de', optimization_up: 'OTIMIZAÇÃO',
+      opt_desc: 'A otimização define quais sacas pertencem a cada rota. A extração traz o QR real de cada saca para impressão.',
+      sel_all: 'Sel. todos', clear_sel: 'Limpar seleção', restore: 'Restaurar excluídas',
+      view_extr: 'Dados extração', save_choice: 'Salvar escolha de sacas', copies: 'cópias',
+      print: 'Imprimir', extr_title: 'Dados da Extração NEX', cancel: 'Cancelar', import_btn: 'Importar',
+      bags: 'sacas', sel_group: 'Sel. grupo', no_qr: 'sem QR — importe a extração',
+      last_save: 'Último salvamento: ', saved_ok: 'Escolha salva!', restored: 'Configuração recuperada!',
+      no_saved: 'Nenhuma configuração salva encontrada.', hyb: 'HÍBRIDA'
+    },
+    es: {
+      site: 'Sitio', avail_bags: 'Sacas disponibles ↗', optimization: 'Optimización',
+      attach_csv: 'Adjuntar CSV', load_extr: 'Extração (QR)', load_saved: 'Recuperar guardado',
+      import_kicker: 'Importá el archivo de', optimization_up: 'OPTIMIZACIÓN',
+      opt_desc: 'La optimización define qué sacas pertenecen a cada ruta. La extração trae el QR real de cada saca para imprimir.',
+      sel_all: 'Sel. todos', clear_sel: 'Limpiar selección', restore: 'Restaurar excluidas',
+      view_extr: 'Datos extración', save_choice: 'Guardar elección de sacas', copies: 'copias',
+      print: 'Imprimir', extr_title: 'Datos de la Extración NEX', cancel: 'Cancelar', import_btn: 'Importar',
+      bags: 'sacas', sel_group: 'Sel. grupo', no_qr: 'sin QR — importá la extração',
+      last_save: 'Último guardado: ', saved_ok: '¡Elección guardada!', restored: '¡Configuración recuperada!',
+      no_saved: 'Ninguna configuración guardada encontrada.', hyb: 'HÍBRIDA'
     }
-    var badge = document.getElementById('storageBadge');
-    if (window.GridStore.isRunningInGrid()) {
-      badge.textContent = 'Guardado en Grid';
-      badge.classList.remove('local');
-    } else {
-      badge.textContent = 'Modo local (sin persistencia)';
-      badge.classList.add('local');
-    }
-    renderAll();
-  }
-
-  // ---------- CSV parsing ----------
-
-  function parseDelimited(text) {
-    var firstLine = (text.split(/\r\n|\n/, 1)[0] || '');
-    var candidates = [',', ';', '\t'];
-    var delimiter = candidates.reduce(function (best, d) {
-      return firstLine.split(d).length > firstLine.split(best).length ? d : best;
-    }, ',');
-    var rows = [];
-    var row = [];
-    var field = '';
-    var inQuotes = false;
-    for (var i = 0; i < text.length; i++) {
-      var c = text[i];
-      if (inQuotes) {
-        if (c === '"') {
-          if (text[i + 1] === '"') { field += '"'; i++; }
-          else inQuotes = false;
-        } else field += c;
-      } else if (c === '"') {
-        inQuotes = true;
-      } else if (c === delimiter) {
-        row.push(field); field = '';
-      } else if (c === '\n' || c === '\r') {
-        if (c === '\r' && text[i + 1] === '\n') i++;
-        row.push(field); field = '';
-        if (row.length > 1 || row[0] !== '') rows.push(row);
-        row = [];
-      } else {
-        field += c;
-      }
-    }
-    if (field !== '' || row.length) { row.push(field); rows.push(row); }
-    return rows;
-  }
-
-  function detectFileKind(headers) {
-    var upper = headers.map(function (h) { return h.trim().toUpperCase(); });
-    var hasOpt = upper.some(function (h) { return h.indexOf('OTIMIZADO') !== -1 || h.indexOf('QUANTIDADE DE SACAS') !== -1 || h.indexOf('TIPOS DE SERVI') !== -1; });
-    var hasSep = upper.indexOf('ROTAPL') !== -1 || upper.indexOf('ROTASACA') !== -1;
-    var hasExtracao = upper.indexOf('CONTAINER_QR') !== -1 || upper.indexOf('CONTAINER_ID') !== -1;
-    if (hasExtracao) return 'extracao';
-    if (hasSep) return 'separacao';
-    if (hasOpt) return 'optimization';
-    return 'optimization';
-  }
-
-  function handleFileSelect(file) {
-    var reader = new FileReader();
-    reader.onload = function (e) {
-      var rows = parseDelimited(String(e.target.result || ''));
-      if (!rows.length) {
-        alertBox('importAlert', 'El archivo está vacío o no se pudo leer.', 'danger');
-        return;
-      }
-      var headers = rows[0].map(function (h) { return h.trim(); });
-      var dataRows = rows.slice(1).filter(function (r) { return r.some(function (v) { return v.trim() !== ''; }); });
-      parsedRows = { headers: headers, rows: dataRows, fileName: file.name };
-      fileKind = detectFileKind(headers);
-      renderMapping();
-    };
-    reader.onerror = function () {
-      alertBox('importAlert', 'No se pudo leer el archivo.', 'danger');
-    };
-    reader.readAsText(file, 'UTF-8');
-  }
-
-  function alertBox(id, message, kind) {
-    var el = document.getElementById(id);
-    if (!el) return;
-    el.textContent = message;
-    el.style.display = message ? 'block' : 'none';
-    el.style.background = '';
-    el.style.color = '';
-    el.style.borderColor = '';
-    if (kind === 'danger') {
-      el.style.background = 'var(--danger-bg)';
-      el.style.color = 'var(--danger)';
-      el.style.borderColor = 'var(--danger)';
-    } else if (kind === 'success') {
-      el.style.background = 'var(--success-bg)';
-      el.style.color = 'var(--success)';
-      el.style.borderColor = 'var(--success)';
-    }
-  }
-
-  var COLUMN_CANDIDATES = {
-    idPlanejado: ['ID PLANEJADO'],
-    idOtimizado: ['ID OTIMIZADO'],
-    detalhe: ['DETALHE DO ROTEIRO'],
-    tipoServico: ['TIPOS DE SERVIÇOS', 'TIPOS DE SERVICOS'],
-    qtdSacas: ['QUANTIDADE DE SACAS'],
-    tipoVeiculo: ['TIPO DE VEÍCULO', 'TIPO DE VEICULO'],
-    pacotesEstimados: ['PACOTES ESTIMADOS'],
-
-    rotapl: ['ROTAPL'],
-    sacaSeq: ['ROTASACA'],
-    sacaCode: ['ROTASACAPL'],
-    veiculo: ['VEICULO', 'VEÍCULO'],
-    empresa: ['EMPRESA'],
-    agencia: ['AGENCIA', 'AGÊNCIA'],
-    servico: ['SERVICO', 'SERVIÇO'],
-
-    site: ['SITE'],
-    extracaoRota: ['ROTA'],
-    containerId: ['CONTAINER_ID'],
-    containerQr: ['CONTAINER_QR']
   };
-
-  function guessColumn(headers, candidates) {
-    var upper = headers.map(function (h) { return h.trim().toUpperCase(); });
-    for (var c = 0; c < candidates.length; c++) {
-      var idx = upper.indexOf(candidates[c]);
-      if (idx !== -1) return idx;
-    }
-    for (var c2 = 0; c2 < candidates.length; c2++) {
-      for (var i = 0; i < upper.length; i++) {
-        if (upper[i].indexOf(candidates[c2]) !== -1) return i;
-      }
-    }
-    return -1;
-  }
-
-  function isHybridToken(value) {
-    var v = String(value || '').trim().toUpperCase();
-    return ['HYBRID', 'HIBRIDA', 'HÍBRIDA', 'HIBRIDO', 'HÍBRIDO', 'SIM', 'S', 'Y', 'YES', '1', 'TRUE', 'X'].indexOf(v) !== -1;
-  }
-
-  // ---------- import mapping screen ----------
-
-  function selectHtml(id, headers, selectedIdx) {
-    var opts = ['<option value="">— no usar —</option>'].concat(
-      headers.map(function (h, idx) {
-        return '<option value="' + idx + '"' + (idx === selectedIdx ? ' selected' : '') + '>' + escapeHtml(h) + '</option>';
-      })
-    ).join('');
-    return '<select id="' + id + '">' + opts + '</select>';
-  }
-
-  function defaultLoteId() {
-    var d = new Date();
-    return d.toISOString().slice(0, 10);
-  }
-
-  function renderMapping() {
-    var wrap = document.getElementById('mappingWrap');
-    if (!parsedRows) { wrap.innerHTML = ''; return; }
-    var h = parsedRows.headers;
-
-    var kindPicker =
-      '<div class="field-row">' +
-      '<label>Lote / turno<input type="text" id="loteInput" value="' + escapeHtml(state.loteId || defaultLoteId()) + '"></label>' +
-      '<label>Tipo de archivo' +
-      '<select id="fileKindSelect">' +
-      '<option value="optimization"' + (fileKind === 'optimization' ? ' selected' : '') + '>Optimización (pre-triagem: cantidad de sacas + híbrida)</option>' +
-      '<option value="separacao"' + (fileKind === 'separacao' ? ' selected' : '') + '>Separação / Q_SEPARACAO (sorting: sacas reales)</option>' +
-      '<option value="extracao"' + (fileKind === 'extracao' ? ' selected' : '') + '>Extração (QR real de la saca física)</option>' +
-      '</select></label>' +
-      '</div>';
-
-    var fieldsHtml = fileKind === 'optimization' ? optimizationFieldsHtml(h)
-      : fileKind === 'extracao' ? extracaoFieldsHtml(h)
-      : separacaoFieldsHtml(h);
-
-    wrap.innerHTML =
-      '<div class="card">' +
-      '<h2>2. Mapear columnas — ' + escapeHtml(parsedRows.fileName) + ' (' + parsedRows.rows.length + ' filas)</h2>' +
-      '<p class="muted">Detectamos el tipo de archivo y las columnas automáticamente. Revisá y ajustá si hace falta.</p>' +
-      kindPicker +
-      '<div id="kindFieldsWrap">' + fieldsHtml + '</div>' +
-      '<div id="servicoFilterWrap"></div>' +
-      '<table class="data-table"><thead><tr>' +
-      h.map(function (hh) { return '<th>' + escapeHtml(hh) + '</th>'; }).join('') +
-      '</tr></thead><tbody>' +
-      parsedRows.rows.slice(0, 5).map(function (r) {
-        return '<tr>' + h.map(function (_, i) { return '<td>' + escapeHtml(r[i] || '') + '</td>'; }).join('') + '</tr>';
-      }).join('') +
-      '</tbody></table>' +
-      '<p class="muted">Mostrando las primeras 5 filas de ' + parsedRows.rows.length + '.</p>' +
-      '<button class="btn" id="confirmImportBtn">Importar rutas</button>' +
-      '</div>';
-
-    document.getElementById('fileKindSelect').addEventListener('change', function () {
-      fileKind = this.value;
-      renderMapping();
+  function t(k) { return (I18N[state.lang] && I18N[state.lang][k]) || I18N.pt[k] || k; }
+  function applyLang() {
+    document.querySelectorAll('[data-i18n]').forEach(function (el) {
+      var k = el.getAttribute('data-i18n'); if (I18N[state.lang][k]) el.textContent = I18N[state.lang][k];
     });
-    document.getElementById('confirmImportBtn').addEventListener('click', confirmImport);
-
-    if (fileKind === 'separacao') {
-      document.getElementById('mapServico').addEventListener('change', renderServicoFilters);
-      renderServicoFilters();
-    }
+    var s = document.getElementById('searchInput');
+    if (s) s.placeholder = state.lang === 'pt' ? 'Buscar rota (ex: G1)…' : 'Buscar ruta (ej: G1)…';
   }
 
-  function optimizationFieldsHtml(h) {
-    var g = {
-      idPlanejado: guessColumn(h, COLUMN_CANDIDATES.idPlanejado),
-      idOtimizado: guessColumn(h, COLUMN_CANDIDATES.idOtimizado),
-      detalhe: guessColumn(h, COLUMN_CANDIDATES.detalhe),
-      tipoServico: guessColumn(h, COLUMN_CANDIDATES.tipoServico),
-      qtdSacas: guessColumn(h, COLUMN_CANDIDATES.qtdSacas),
-      tipoVeiculo: guessColumn(h, COLUMN_CANDIDATES.tipoVeiculo),
-      pacotesEstimados: guessColumn(h, COLUMN_CANDIDATES.pacotesEstimados)
-    };
-    return '<div class="field-row">' +
-      '<label>ID Planejado — clave de ruta (obligatoria)' + selectHtml('mapIdPlanejado', h, g.idPlanejado) + '</label>' +
-      '<label>ID Otimizado — etiqueta de estación' + selectHtml('mapIdOtimizado', h, g.idOtimizado) + '</label>' +
-      '<label>Detalhe do roteiro' + selectHtml('mapDetalhe', h, g.detalhe) + '</label>' +
-      '</div>' +
-      '<div class="field-row">' +
-      '<label>Tipos de serviços (híbrida)' + selectHtml('mapTipoServico', h, g.tipoServico) + '</label>' +
-      '<label>Quantidade de sacas' + selectHtml('mapQtdSacas', h, g.qtdSacas) + '</label>' +
-      '<label>Tipo de veículo' + selectHtml('mapTipoVeiculo', h, g.tipoVeiculo) + '</label>' +
-      '<label>Pacotes estimados' + selectHtml('mapPacotesEstimados', h, g.pacotesEstimados) + '</label>' +
-      '</div>';
-  }
-
-  function separacaoFieldsHtml(h) {
-    var g = {
-      rotapl: guessColumn(h, COLUMN_CANDIDATES.rotapl),
-      sacaSeq: guessColumn(h, COLUMN_CANDIDATES.sacaSeq),
-      sacaCode: guessColumn(h, COLUMN_CANDIDATES.sacaCode),
-      veiculo: guessColumn(h, COLUMN_CANDIDATES.veiculo),
-      empresa: guessColumn(h, COLUMN_CANDIDATES.empresa),
-      agencia: guessColumn(h, COLUMN_CANDIDATES.agencia),
-      servico: guessColumn(h, COLUMN_CANDIDATES.servico)
-    };
-    return '<div class="field-row">' +
-      '<label>ROTAPL — clave de ruta (obligatoria)' + selectHtml('mapRotapl', h, g.rotapl) + '</label>' +
-      '<label>ROTASACA — nro. de saca' + selectHtml('mapSacaSeq', h, g.sacaSeq) + '</label>' +
-      '<label>ROTASACAPL — código físico' + selectHtml('mapSacaCode', h, g.sacaCode) + '</label>' +
-      '</div>' +
-      '<div class="field-row">' +
-      '<label>Vehículo' + selectHtml('mapVeiculo', h, g.veiculo) + '</label>' +
-      '<label>Empresa' + selectHtml('mapEmpresa', h, g.empresa) + '</label>' +
-      '<label>Agência' + selectHtml('mapAgencia', h, g.agencia) + '</label>' +
-      '<label>Serviço (para filtrar filas Nex)' + selectHtml('mapServico', h, g.servico) + '</label>' +
-      '</div>';
-  }
-
-  function extracaoFieldsHtml(h) {
-    var g = {
-      site: guessColumn(h, COLUMN_CANDIDATES.site),
-      rota: guessColumn(h, COLUMN_CANDIDATES.extracaoRota),
-      containerId: guessColumn(h, COLUMN_CANDIDATES.containerId),
-      containerQr: guessColumn(h, COLUMN_CANDIDATES.containerQr)
-    };
-    return '<p class="muted">Cruza por número de saca: sólo se usan las filas donde ROTA es puramente numérica (sacas NEX) — las filas con letras (rutas/CHP) se ignoran acá.</p>' +
-      '<div class="field-row">' +
-      '<label>Site' + selectHtml('mapSite', h, g.site) + '</label>' +
-      '<label>ROTA — número de saca (obligatoria)' + selectHtml('mapExtracaoRota', h, g.rota) + '</label>' +
-      '<label>CONTAINER_ID' + selectHtml('mapContainerId', h, g.containerId) + '</label>' +
-      '<label>CONTAINER_QR — QR real (obligatoria)' + selectHtml('mapContainerQr', h, g.containerQr) + '</label>' +
-      '</div>';
-  }
-
-  function renderServicoFilters() {
-    var idx = document.getElementById('mapServico').value;
-    var wrap = document.getElementById('servicoFilterWrap');
-    if (idx === '') { wrap.innerHTML = ''; return; }
-    idx = parseInt(idx, 10);
-    var uniq = {};
-    parsedRows.rows.forEach(function (r) {
-      var v = (r[idx] || '').trim();
-      if (v) uniq[v] = true;
-    });
-    var values = Object.keys(uniq).sort();
-    if (!values.length) { wrap.innerHTML = ''; return; }
-    wrap.innerHTML = '<p class="muted" style="margin-bottom:4px">¿Qué valores de "Serviço" pertenecen al flujo Nex? (se van a importar solo esas filas)</p>' +
-      '<div class="field-row" style="gap:10px">' +
-      values.map(function (v) {
-        var checked = /NEX/i.test(v) ? ' checked' : '';
-        return '<label style="flex-direction:row; align-items:center; gap:6px"><input type="checkbox" class="servicoCheck" value="' + escapeHtml(v) + '"' + checked + '>' + escapeHtml(v) + '</label>';
-      }).join('') +
-      '</div>';
-  }
-
-  function val(id) {
-    var el = document.getElementById(id);
-    if (!el) return -1;
-    var v = el.value;
-    return v === '' ? -1 : parseInt(v, 10);
-  }
-
-  function getOrCreateRoute(key) {
-    for (var i = 0; i < state.routes.length; i++) {
-      if (state.routes[i].key === key) return state.routes[i];
-    }
-    var fresh = {
-      key: key,
-      stationLabel: null,
-      detalheRoteiro: null,
-      veiculoPlanejado: null,
-      pacotesEstimados: null,
-      expectedSacas: null,
-      hybridExplicit: null,
-      hybridGuess: false,
-      hybridManual: null,
-      sacas: []
-    };
-    state.routes.push(fresh);
-    return fresh;
-  }
-
-  function confirmImport() {
-    var loteId = document.getElementById('loteInput').value.trim() || defaultLoteId();
-    state.loteId = loteId;
-
-    if (fileKind === 'optimization') confirmImportOptimization();
-    else if (fileKind === 'extracao') confirmImportExtracao();
-    else confirmImportSeparacao();
-
-    persist();
-    renderAll();
-    switchTab('assign');
-  }
-
-  function confirmImportOptimization() {
-    var idxKey = val('mapIdPlanejado');
-    var idxLabel = val('mapIdOtimizado');
-    var idxDetalhe = val('mapDetalhe');
-    var idxTipoServico = val('mapTipoServico');
-    var idxQtd = val('mapQtdSacas');
-    var idxVeiculo = val('mapTipoVeiculo');
-    var idxPacotes = val('mapPacotesEstimados');
-
-    if (idxKey === -1) {
-      alertBox('importAlert', 'Elegí la columna "ID Planejado" — es la clave de ruta.', 'danger');
-      return;
-    }
-
-    var count = 0;
-    parsedRows.rows.forEach(function (r) {
-      var key = (r[idxKey] || '').trim();
-      if (!key) return;
-      var route = getOrCreateRoute(key);
-      if (idxLabel !== -1) route.stationLabel = (r[idxLabel] || '').trim() || route.stationLabel;
-      if (idxDetalhe !== -1) route.detalheRoteiro = (r[idxDetalhe] || '').trim() || route.detalheRoteiro;
-      if (idxVeiculo !== -1) route.veiculoPlanejado = (r[idxVeiculo] || '').trim() || route.veiculoPlanejado;
-      if (idxPacotes !== -1) {
-        var pe = parseInt(r[idxPacotes], 10);
-        if (!isNaN(pe)) route.pacotesEstimados = pe;
-      }
-      if (idxTipoServico !== -1) route.hybridExplicit = isHybridToken(r[idxTipoServico]);
-      if (idxQtd !== -1 && route.sacas.length === 0) {
-        var q = parseInt(r[idxQtd], 10);
-        if (!isNaN(q)) route.expectedSacas = q;
-      }
-      count++;
-    });
-
-    state.lastOptimizationImport = { fileName: parsedRows.fileName, importedAt: new Date().toISOString() };
-    alertBox('importAlert', count + ' rutas actualizadas desde el archivo de optimización.', 'success');
-  }
-
-  function confirmImportSeparacao() {
-    var idxRoute = val('mapRotapl');
-    var idxSacaSeq = val('mapSacaSeq');
-    var idxSacaCode = val('mapSacaCode');
-    var idxVeiculo = val('mapVeiculo');
-    var idxEmpresa = val('mapEmpresa');
-    var idxAgencia = val('mapAgencia');
-    var idxServico = val('mapServico');
-
-    if (idxRoute === -1) {
-      alertBox('importAlert', 'Elegí la columna ROTAPL — es la clave de ruta.', 'danger');
-      return;
-    }
-
-    var allowedServicos = null;
-    if (idxServico !== -1) {
-      allowedServicos = {};
-      document.querySelectorAll('.servicoCheck:checked').forEach(function (c) { allowedServicos[c.value] = true; });
-    }
-
-    var byRoute = {};
-    var order = [];
-    var skippedByServico = 0;
-
-    parsedRows.rows.forEach(function (r) {
-      var key = (r[idxRoute] || '').trim();
-      if (!key) return;
-      if (allowedServicos && idxServico !== -1) {
-        var sv = (r[idxServico] || '').trim();
-        if (sv && !allowedServicos[sv]) { skippedByServico++; return; }
-      }
-      if (!byRoute[key]) { byRoute[key] = { veiculos: {}, empresas: {}, realSacas: [] }; order.push(key); }
-      var info = byRoute[key];
-
-      var seqRaw = idxSacaSeq !== -1 ? (r[idxSacaSeq] || '').trim() : '';
-      if (seqRaw !== '') {
-        var veiculo = idxVeiculo !== -1 ? (r[idxVeiculo] || '').trim() : '';
-        var empresa = idxEmpresa !== -1 ? (r[idxEmpresa] || '').trim() : '';
-        var agencia = idxAgencia !== -1 ? (r[idxAgencia] || '').trim() : '';
-        var code = idxSacaCode !== -1 ? (r[idxSacaCode] || '').trim() : '';
-        if (veiculo) info.veiculos[veiculo] = true;
-        if (empresa) info.empresas[empresa] = true;
-        info.realSacas.push({
-          seq: parseInt(seqRaw, 10) || (info.realSacas.length + 1),
-          physicalCode: code || null,
-          label: code || seqRaw,
-          veiculo: veiculo,
-          empresa: empresa,
-          agencia: agencia,
-          realQrPayload: null,
-          containerId: null,
-          printedAt: null
-        });
-      }
-    });
-
-    var newCount = 0, updatedCount = 0, unchangedCount = 0;
-    order.forEach(function (key) {
-      var info = byRoute[key];
-      info.realSacas.sort(function (a, b) { return a.seq - b.seq; });
-      var isNew = !state.routes.some(function (r) { return r.key === key; });
-      var route = getOrCreateRoute(key);
-      var distinctVehicles = Object.keys(info.veiculos).length;
-      var distinctEmpresas = Object.keys(info.empresas).length;
-      route.hybridGuess = distinctVehicles > 1 || distinctEmpresas > 1 || route.hybridGuess;
-
-      if (info.realSacas.length > 0) {
-        // Carry forward any real QR already attached (from an "extração" import) to
-        // the same saca number, so re-importing separação doesn't wipe it out.
-        var previousBySeq = {};
-        route.sacas.forEach(function (s) { if (s.realQrPayload) previousBySeq[s.seq] = s; });
-        info.realSacas.forEach(function (s) {
-          var prev = previousBySeq[s.seq];
-          if (prev) { s.realQrPayload = prev.realQrPayload; s.containerId = prev.containerId; }
-        });
-
-        route.sacas = info.realSacas;
-        route.expectedSacas = info.realSacas.length;
-        if (isNew) newCount++; else updatedCount++;
-      } else {
-        if (isNew) newCount++; else unchangedCount++;
-      }
-    });
-
-    state.lastSeparacaoImport = { fileName: parsedRows.fileName, importedAt: new Date().toISOString() };
-    var msg = order.length + ' rutas en el archivo — ' + newCount + ' nuevas, ' + updatedCount + ' actualizadas con sacas reales, ' + unchangedCount + ' sin cambios.';
-    if (skippedByServico) msg += ' (' + skippedByServico + ' filas ignoradas por Serviço)';
-    alertBox('importAlert', msg, 'success');
-  }
-
-  function confirmImportExtracao() {
-    var idxRota = val('mapExtracaoRota');
-    var idxContainerId = val('mapContainerId');
-    var idxContainerQr = val('mapContainerQr');
-
-    if (idxRota === -1 || idxContainerQr === -1) {
-      alertBox('importAlert', 'Elegí las columnas ROTA y CONTAINER_QR.', 'danger');
-      return;
-    }
-
-    // Index every known saca by its sequence number across all routes — NUMERO_NEX
-    // is a global pool for the whole site/cycle, not per-route.
-    var sacaBySeq = {};
-    state.routes.forEach(function (route) {
-      route.sacas.forEach(function (s) { sacaBySeq[s.seq] = s; });
-    });
-
-    var matched = 0, skippedNonNumeric = 0, unmatched = 0;
-    parsedRows.rows.forEach(function (r) {
-      var rota = (r[idxRota] || '').trim();
-      if (!/^\d+$/.test(rota)) { skippedNonNumeric++; return; }
-      var seq = parseInt(rota, 10);
-      var qr = (r[idxContainerQr] || '').trim();
-      if (!qr) return;
-      var saca = sacaBySeq[seq];
-      if (!saca) { unmatched++; return; }
-      saca.realQrPayload = qr;
-      saca.containerId = idxContainerId !== -1 ? (r[idxContainerId] || '').trim() : saca.containerId;
-      matched++;
-    });
-
-    state.lastExtracaoImport = { fileName: parsedRows.fileName, importedAt: new Date().toISOString() };
-    var msg = matched + ' sacas con QR real cargado.';
-    if (unmatched) msg += ' ' + unmatched + ' números de saca no encontrados en las rutas ya importadas (¿faltó importar la separação primero?).';
-    if (skippedNonNumeric) msg += ' (' + skippedNonNumeric + ' filas de rutas/CHP ignoradas)';
-    alertBox('importAlert', msg, matched > 0 ? 'success' : 'danger');
-  }
-
-  // ---------- assignment screen ----------
-
-  function isHybridEffective(route) {
-    if (route.hybridManual != null) return route.hybridManual;
-    if (route.hybridExplicit != null) return route.hybridExplicit;
-    return !!route.hybridGuess;
-  }
-
-  function hybridSourceLabel(route) {
-    if (route.hybridManual != null) return '';
-    if (route.hybridExplicit != null) return ' <span class="muted">(del archivo)</span>';
-    if (route.hybridGuess) return ' <span class="muted">(sugerida)</span>';
-    return '';
-  }
-
-  function routeDisplayName(route) {
-    return route.stationLabel || route.key;
-  }
-
-  function renderAssign() {
-    var wrap = document.getElementById('routesWrap');
-    if (!state.routes.length) {
-      wrap.innerHTML = '<div class="placeholder">Todavía no importaste ningún archivo.<br>Andá a la pestaña "Importar" para empezar.</div>';
-      return;
-    }
-
-    wrap.innerHTML = state.routes.map(function (route, rIdx) {
-      var chips = route.sacas.map(function (s, sIdx) {
-        var qrBadge = s.realQrPayload
-          ? ' <span class="badge" style="background:var(--success-bg);color:var(--success)" title="QR real de la extração">QR real</span>'
-          : ' <span class="badge" title="Todavía no llegó el QR real de la extração">provisório</span>';
-        return '<span class="saca-chip' + (s.printedAt ? ' printed' : '') + '">' +
-          'Saca ' + escapeHtml(s.label) + (s.veiculo ? ' · ' + escapeHtml(s.veiculo) : '') + qrBadge +
-          '<button data-route="' + rIdx + '" data-saca="' + sIdx + '" class="removeSacaBtn" title="Quitar">&times;</button>' +
-          '</span>';
-      }).join('');
-
-      var expected = route.expectedSacas;
-      var countLabel = expected ? (route.sacas.length + ' / ' + expected + ' sacas') : (route.sacas.length + ' sacas');
-      var hybrid = isHybridEffective(route);
-      var infoBits = [route.detalheRoteiro, route.veiculoPlanejado, route.pacotesEstimados ? (route.pacotesEstimados + ' pacotes est.') : null].filter(Boolean);
-
-      return '<div class="route-card">' +
-        '<div class="route-head">' +
-        '<strong>' + escapeHtml(routeDisplayName(route)) + '</strong>' +
-        '<span class="muted">pool: ' + escapeHtml(route.key) + '</span>' +
-        '<span class="badge route-count">' + countLabel + '</span>' +
-        '<label style="flex-direction:row; align-items:center; gap:4px; font-size:12px">' +
-        '<input type="checkbox" class="hybridToggle" data-route="' + rIdx + '"' + (hybrid ? ' checked' : '') + '> Híbrida' +
-        hybridSourceLabel(route) +
-        '</label>' +
-        '</div>' +
-        (infoBits.length ? '<div class="muted" style="margin-bottom:8px">' + infoBits.map(escapeHtml).join(' · ') + '</div>' : '') +
-        '<div class="saca-list">' + chips + '</div>' +
-        '<div style="margin-top:10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap">' +
-        '<input type="text" placeholder="Nro/etiqueta de saca" class="newSacaLabel" data-route="' + rIdx + '" style="width:160px">' +
-        '<button class="btn secondary addSacaBtn" data-route="' + rIdx + '">+ Agregar saca</button>' +
-        (expected ? '<button class="btn secondary autoFillBtn" data-route="' + rIdx + '">Autocompletar 1..' + expected + '</button>' : '') +
-        '</div>' +
-        '</div>';
-    }).join('');
-
-    wrap.querySelectorAll('.removeSacaBtn').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var rIdx = parseInt(btn.getAttribute('data-route'), 10);
-        var sIdx = parseInt(btn.getAttribute('data-saca'), 10);
-        state.routes[rIdx].sacas.splice(sIdx, 1);
-        persist();
-        renderAssign();
-      });
-    });
-
-    wrap.querySelectorAll('.addSacaBtn').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var rIdx = parseInt(btn.getAttribute('data-route'), 10);
-        var input = wrap.querySelector('.newSacaLabel[data-route="' + rIdx + '"]');
-        var label = (input.value || '').trim() || String(state.routes[rIdx].sacas.length + 1);
-        addSaca(rIdx, label);
-        input.value = '';
-      });
-    });
-
-    wrap.querySelectorAll('.autoFillBtn').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var rIdx = parseInt(btn.getAttribute('data-route'), 10);
-        var route = state.routes[rIdx];
-        route.sacas = [];
-        for (var i = 1; i <= route.expectedSacas; i++) {
-          route.sacas.push({ seq: i, physicalCode: null, label: String(i), veiculo: '', empresa: '', agencia: '', realQrPayload: null, containerId: null, printedAt: null });
-        }
-        persist();
-        renderAssign();
-      });
-    });
-
-    wrap.querySelectorAll('.hybridToggle').forEach(function (chk) {
-      chk.addEventListener('change', function () {
-        var rIdx = parseInt(chk.getAttribute('data-route'), 10);
-        state.routes[rIdx].hybridManual = chk.checked;
-        persist();
-        renderAssign();
-      });
-    });
-  }
-
-  function addSaca(routeIdx, label) {
-    var route = state.routes[routeIdx];
-    route.sacas.push({ seq: route.sacas.length + 1, physicalCode: null, label: label, veiculo: '', empresa: '', agencia: '', realQrPayload: null, containerId: null, printedAt: null });
-    persist();
-    renderAssign();
-  }
-
-  // ---------- QR / print screen ----------
-
-  function qrPayloadFor(route, saca) {
-    // Real payload wins: it's the exact JSON the official MELI system already
-    // printed on the physical bag (from the "extração" import). Only fall back
-    // to a placeholder when that hasn't arrived yet for this saca.
-    if (saca.realQrPayload) return saca.realQrPayload;
-    return [
-      'NEX-SSC2-PROVISORIO',
-      'ROTA:' + routeDisplayName(route),
-      'POOL:' + route.key,
-      'SACA:' + saca.label,
-      'LOTE:' + (state.loteId || ''),
-      'HIB:' + (isHybridEffective(route) ? 1 : 0)
-    ].join('|');
-  }
-
-  function renderLabels() {
-    var wrap = document.getElementById('labelsWrap');
-    var all = [];
-    state.routes.forEach(function (route) {
-      route.sacas.forEach(function (saca) { all.push({ route: route, saca: saca }); });
-    });
-
-    if (!all.length) {
-      wrap.innerHTML = '<div class="placeholder">Todavía no hay sacas asignadas.<br>Andá a "Asignar sacas" primero.</div>';
-      return;
-    }
-
-    var grid = document.createElement('div');
-    grid.className = 'label-grid';
-    grid.style.setProperty('--cols', document.getElementById('colsSelect').value || 3);
-
-    all.forEach(function (item) {
-      var card = document.createElement('div');
-      card.className = 'label-card';
-      var payload = qrPayloadFor(item.route, item.saca);
-      card.innerHTML =
-        '<div class="route-id">' + escapeHtml(routeDisplayName(item.route)) + (isHybridEffective(item.route) ? ' <span class="badge">HÍB</span>' : '') + '</div>' +
-        '<div class="saca-seq">SACA ' + escapeHtml(item.saca.label) + '</div>' +
-        '<div class="qr-holder"></div>' +
-        (item.saca.veiculo ? '<div class="lote">' + escapeHtml(item.saca.veiculo) + '</div>' : '') +
-        '<div class="lote">Lote ' + escapeHtml(state.loteId || '') + '</div>' +
-        (item.saca.realQrPayload
-          ? '<div class="lote" style="color:var(--success)">QR real</div>'
-          : '<div class="lote" style="color:var(--warning)">QR provisório — no usar en producción</div>');
-      grid.appendChild(card);
-
-      var qr = window.qrcode(0, 'M');
-      qr.addData(payload);
-      qr.make();
-      card.querySelector('.qr-holder').innerHTML = qr.createSvgTag({ cellSize: 4, margin: 2 });
-    });
-
-    wrap.innerHTML = '';
-    wrap.appendChild(grid);
-  }
-
-  function markAllPrinted() {
-    var now = new Date().toISOString();
-    state.routes.forEach(function (route) {
-      route.sacas.forEach(function (saca) { saca.printedAt = now; });
-    });
-    persist();
-    renderAssign();
-  }
-
-  // ---------- tabs ----------
-
-  function switchTab(name) {
-    document.querySelectorAll('nav.tabs button').forEach(function (b) {
-      b.classList.toggle('active', b.getAttribute('data-tab') === name);
-    });
-    document.querySelectorAll('.screen').forEach(function (s) {
-      s.classList.toggle('active', s.id === 'screen-' + name);
-    });
-    if (name === 'qr') renderLabels();
-  }
-
-  function renderAll() {
-    renderAssign();
-    if (document.getElementById('screen-qr').classList.contains('active')) renderLabels();
-  }
-
-  function escapeHtml(s) {
+  // ---------------------------------------------------------------- helpers
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
   }
+  var toastTimer = null;
+  function toast(msg, ok) {
+    var el = $('toast'); el.textContent = msg;
+    el.className = 'toast show ' + (ok === false ? 'err' : 'ok');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.className = 'toast'; }, 2200);
+  }
+  function excludedSet() { return new Set(state.excluded); }
+  function selectionSet() { return new Set(state.selection); }
+  function prefixOf(id) { return String(id || '').split(/[_-]/)[0].toUpperCase(); }
 
-  // ---------- wiring ----------
+  // ---------------------------------------------------------------- persistence
+  function persist() { state.updatedAt = new Date().toISOString(); window.GridStore.saveDebounced(state, 400); }
 
+  async function init() {
+    var loaded = await window.GridStore.load();
+    if (loaded && loaded.schemaVersion === SCHEMA_VERSION) state = loaded;
+    var badge = $('storageBadge');
+    if (window.GridStore.isRunningInGrid()) { badge.textContent = 'Grid'; badge.classList.remove('local'); }
+    else { badge.textContent = state.lang === 'pt' ? 'Local (preview)' : 'Local (preview)'; badge.classList.add('local'); }
+    $('langSelect').value = state.lang;
+    applyLang();
+    render();
+  }
+
+  // ---------------------------------------------------------------- CSV
+  function parseDelimited(text) {
+    var first = (text.split(/\r\n|\n/, 1)[0] || '');
+    var cand = [',', ';', '\t'];
+    var delim = cand.reduce(function (b, d) { return first.split(d).length > first.split(b).length ? d : b; }, ',');
+    var rows = [], row = [], f = '', q = false;
+    for (var i = 0; i < text.length; i++) {
+      var c = text[i];
+      if (q) { if (c === '"') { if (text[i + 1] === '"') { f += '"'; i++; } else q = false; } else f += c; }
+      else if (c === '"') q = true;
+      else if (c === delim) { row.push(f); f = ''; }
+      else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(f); f = ''; if (row.length > 1 || row[0] !== '') rows.push(row); row = []; }
+      else f += c;
+    }
+    if (f !== '' || row.length) { row.push(f); rows.push(row); }
+    return rows;
+  }
+  function col(headers, cands) {
+    var up = headers.map(function (h) { return h.trim().toUpperCase(); });
+    for (var i = 0; i < cands.length; i++) { var x = up.indexOf(cands[i]); if (x !== -1) return x; }
+    for (var j = 0; j < cands.length; j++) for (var k = 0; k < up.length; k++) if (up[k].indexOf(cands[j]) !== -1) return k;
+    return -1;
+  }
+
+  function chooseFile(kind) {
+    var input = $('fileInput');
+    input.value = '';
+    input.onchange = function (e) {
+      var file = e.target.files && e.target.files[0]; if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function (ev) {
+        var rows = parseDelimited(String(ev.target.result || ''));
+        if (rows.length < 2) { toast('Arquivo vazio ou inválido.', false); return; }
+        pending = { kind: kind, headers: rows[0].map(function (h) { return h.trim(); }),
+          rows: rows.slice(1).filter(function (r) { return r.some(function (v) { return v.trim() !== ''; }); }),
+          fileName: file.name };
+        if (kind === 'opt') importOptimization();
+        else importExtracao();
+      };
+      reader.readAsText(file, 'UTF-8');
+    };
+    input.click();
+  }
+
+  // ---------------------------------------------------------------- imports
+  function importOptimization() {
+    var h = pending.headers;
+    var iPl = col(h, ['ID PLANEJADO', 'ROTAPL', 'PLANEJADO']);
+    var iOt = col(h, ['ID OTIMIZADO', 'ROTAOT', 'OTIMIZADO', 'ROTA']);
+    var iSac = col(h, ['QUANTIDADE DE SACAS', 'QTD_SACAS', 'SACAS', 'QUANTIDADE']);
+    var iSrv = col(h, ['TIPOS DE SERVIÇOS', 'TIPOS DE SERVICOS', 'SERVICO', 'SERVIÇO']);
+    if (iOt === -1 || iSac === -1) { toast('CSV de otimização inválido: faltam colunas de rota/sacas.', false); return; }
+
+    var groups = [], seen = {};
+    pending.rows.forEach(function (r) {
+      var srv = iSrv !== -1 ? String(r[iSrv] || '').toLowerCase() : 'hybrid';
+      if (iSrv !== -1 && srv.indexOf('hybrid') === -1 && srv.indexOf('hibrid') === -1 && srv.indexOf('nex') === -1) return;
+      var cnt = parseInt(r[iSac], 10); if (isNaN(cnt) || cnt <= 0) return;
+      var full = String(r[iOt] || '').trim().toUpperCase(); if (!full) return;
+      var name = prefixOf(full);
+      if (seen[name] != null) { groups[seen[name]].count += cnt; return; }
+      seen[name] = groups.length;
+      groups.push({ name: name, fullName: full, planned: iPl !== -1 ? String(r[iPl] || '').trim().toUpperCase() : '',
+        hybrid: true, count: cnt, realSacas: null });
+    });
+    if (!groups.length) { toast('Nenhuma rota híbrida (NEX) encontrada no arquivo.', false); return; }
+
+    // Global running numbering, skipping any still-excluded numbers.
+    assignRunningNumbers(groups);
+    state.source = 'opt';
+    state.groups = groups;
+    state.optFileName = pending.fileName;
+    state.selection = [];
+    pending = null;
+    persist(); render();
+    toast(groups.length + (state.lang === 'pt' ? ' rotas carregadas' : ' rutas cargadas'), true);
+  }
+
+  function assignRunningNumbers(groups) {
+    var skip = excludedSet(), n = 1;
+    groups.forEach(function (g) {
+      var arr = [], got = 0;
+      while (got < g.count) { if (!skip.has(n)) { arr.push(n); got++; } n++; }
+      g.realSacas = arr;
+    });
+  }
+
+  function importExtracao() {
+    var h = pending.headers;
+    var iRota = col(h, ['ROTASACA']);            // global saca number
+    var iOt = col(h, ['ROTAOT', 'ID OTIMIZADO']);
+    var iPl = col(h, ['ROTAPL', 'ID PLANEJADO']);
+    var iQr = col(h, ['CONTAINER_QR']);
+    var iCode = col(h, ['ROTASACAPL']);
+    var iAg = col(h, ['AGENCIA', 'AGÊNCIA']);
+    var iVe = col(h, ['VEICULO', 'VEÍCULO']);
+    if (iRota === -1 || iOt === -1) { toast('CSV de extração inválido: faltam ROTASACA/ROTAOT.', false); return; }
+
+    var byGroup = {}, order = [], qr = {}, meta = {}, skipped = 0;
+    pending.rows.forEach(function (r) {
+      var numRaw = String(r[iRota] || '').trim();
+      if (!/^\d+$/.test(numRaw)) { skipped++; return; }  // only numeric = NEX sack rows
+      var num = parseInt(numRaw, 10);
+      var full = String(r[iOt] || '').trim().toUpperCase(); if (!full) return;
+      var name = prefixOf(full);
+      if (!byGroup[name]) { byGroup[name] = { name: name, fullName: full,
+        planned: iPl !== -1 ? String(r[iPl] || '').trim().toUpperCase() : '', hybrid: true, count: 0, nums: [] };
+        order.push(name); }
+      byGroup[name].nums.push(num);
+      if (iQr !== -1 && r[iQr]) qr[num] = String(r[iQr]).trim();
+      meta[num] = { agencia: iAg !== -1 ? String(r[iAg] || '').trim() : '',
+        veiculo: iVe !== -1 ? String(r[iVe] || '').trim() : '',
+        rotasacapl: iCode !== -1 ? String(r[iCode] || '').trim() : '' };
+    });
+    if (!order.length) { toast('Nenhuma saca NEX (ROTASACA numérica) encontrada.', false); return; }
+
+    var groups = order.map(function (name) {
+      var g = byGroup[name];
+      g.nums.sort(function (a, b) { return a - b; });
+      return { name: g.name, fullName: g.fullName, planned: g.planned, hybrid: true,
+        count: g.nums.length, realSacas: g.nums };
+    });
+
+    state.source = 'extr';
+    state.groups = groups;
+    state.qrByNum = qr;
+    state.metaByNum = meta;
+    state.optFileName = pending.fileName;
+    state.excluded = [];
+    state.selection = [];
+    pending = null;
+    persist(); render();
+    var msg = groups.length + (state.lang === 'pt' ? ' rotas' : ' rutas') + ' · ' + Object.keys(qr).length + ' QR';
+    if (skipped) msg += ' (' + skipped + (state.lang === 'pt' ? ' linhas de rota/CHP ignoradas' : ' filas de ruta/CHP ignoradas') + ')';
+    toast(msg, true);
+  }
+
+  function clearOptimization() {
+    state.source = null; state.groups = []; state.selection = []; state.excluded = [];
+    state.optFileName = null;
+    persist(); render();
+  }
+
+  function restoreSaved() {
+    if (!state.groups.length) { toast(t('no_saved'), false); return; }
+    render();
+    toast(t('restored'), true);
+  }
+
+  // ---------------------------------------------------------------- rendering
+  function renderableNums(group) {
+    if (state.source === 'opt') { assignRunningNumbers(state.groups); }
+    var skip = excludedSet();
+    return group.realSacas.filter(function (n) { return !skip.has(n); });
+  }
+
+  function render() {
+    var has = state.groups.length > 0;
+    $('emptyState').style.display = has ? 'none' : 'flex';
+    $('gridWrapper').style.display = has ? 'block' : 'none';
+    $('activeFile').style.display = state.optFileName ? 'inline-flex' : 'none';
+    if (state.optFileName) $('activeFileName').textContent = state.optFileName;
+    $('lastSave').textContent = state.lastSave ? (t('last_save') + state.lastSave) : '';
+    if (has) renderRoutes();
+    updatePrintBar();
+  }
+
+  function renderRoutes() {
+    var wrap = $('routesWrap');
+    var term = ($('searchInput').value || '').trim().toUpperCase();
+    var sel = selectionSet();
+    wrap.innerHTML = '';
+
+    state.groups.forEach(function (group) {
+      if (term && group.name.indexOf(term) === -1) return;
+      var nums = renderableNums(group);
+
+      var card = document.createElement('div');
+      card.className = 'route-card';
+      var head = '<div class="route-head">' +
+        '<span class="name">' + esc(group.name) + '</span>' +
+        '<span class="badge">' + nums.length + ' ' + t('bags') + '</span>' +
+        (group.hybrid ? '<span class="badge hyb">' + t('hyb') + '</span>' : '') +
+        (group.fullName && group.fullName !== group.name ? '<span class="full-route">' + esc(group.fullName) + (group.planned ? ' · ' + esc(group.planned) : '') + '</span>' : '') +
+        '<span style="flex:1"></span>' +
+        '<button class="btn ghost sm selGroup" data-g="' + esc(group.name) + '">' + t('sel_group') + '</button>' +
+        '</div>';
+      var grid = '<div class="saca-grid">';
+      nums.forEach(function (num) {
+        var hasQr = !!state.qrByNum[num];
+        var isSel = sel.has(num);
+        var cls = 'saca' + (isSel ? ' selected' : '') + (hasQr ? '' : ' disabled');
+        var title = hasQr ? '' : ' title="' + t('no_qr') + '"';
+        grid += '<button class="' + cls + '" data-num="' + num + '"' + title + '>' + num +
+          (hasQr ? '<span class="rm" data-rm="' + num + '">&times;</span>' : '') + '</button>';
+      });
+      grid += '</div>';
+      card.innerHTML = head + grid;
+      wrap.appendChild(card);
+    });
+
+    wrap.querySelectorAll('.saca').forEach(function (btn) {
+      var num = parseInt(btn.getAttribute('data-num'), 10);
+      if (btn.classList.contains('disabled')) return;
+      btn.addEventListener('click', function (e) {
+        if (e.target.getAttribute('data-rm')) return;
+        var s = selectionSet();
+        if (s.has(num)) s.delete(num); else s.add(num);
+        state.selection = Array.from(s);
+        persist(); renderRoutes(); updatePrintBar();
+      });
+    });
+    wrap.querySelectorAll('.rm').forEach(function (x) {
+      x.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var num = parseInt(x.getAttribute('data-rm'), 10);
+        var ex = excludedSet(); ex.add(num); state.excluded = Array.from(ex);
+        var s = selectionSet(); s.delete(num); state.selection = Array.from(s);
+        persist(); renderRoutes(); updatePrintBar();
+      });
+    });
+    wrap.querySelectorAll('.selGroup').forEach(function (b) {
+      b.addEventListener('click', function () { selectGroup(b.getAttribute('data-g')); });
+    });
+  }
+
+  function selectGroup(name) {
+    var group = state.groups.filter(function (g) { return g.name === name; })[0];
+    if (!group) return;
+    var nums = renderableNums(group).filter(function (n) { return !!state.qrByNum[n]; });
+    var s = selectionSet();
+    var allSel = nums.length > 0 && nums.every(function (n) { return s.has(n); });
+    nums.forEach(function (n) { if (allSel) s.delete(n); else s.add(n); });
+    state.selection = Array.from(s);
+    persist(); renderRoutes(); updatePrintBar();
+  }
+
+  function selectAllVisible() {
+    var term = ($('searchInput').value || '').trim().toUpperCase();
+    var s = selectionSet(); var all = [];
+    state.groups.forEach(function (g) {
+      if (term && g.name.indexOf(term) === -1) return;
+      renderableNums(g).forEach(function (n) { if (state.qrByNum[n]) all.push(n); });
+    });
+    var allSel = all.length > 0 && all.every(function (n) { return s.has(n); });
+    all.forEach(function (n) { if (allSel) s.delete(n); else s.add(n); });
+    state.selection = Array.from(s);
+    persist(); renderRoutes(); updatePrintBar();
+  }
+
+  function updatePrintBar() {
+    var n = state.selection.length;
+    $('printCount').textContent = n;
+    $('btnPrint').disabled = (n === 0);
+  }
+
+  // ---------------------------------------------------------------- save
+  function saveChoice() {
+    state.lastSave = new Date().toLocaleString(state.lang === 'pt' ? 'pt-BR' : 'es-AR');
+    window.GridStore.saveNow(state);
+    $('lastSave').textContent = t('last_save') + state.lastSave;
+    toast(t('saved_ok'), true);
+  }
+
+  // ---------------------------------------------------------------- extraction viewer
+  function openExtracao() {
+    var nums = Object.keys(state.metaByNum).map(Number).sort(function (a, b) { return a - b; });
+    var head = $('extracaoHead'), body = $('extracaoBody');
+    head.innerHTML = '<tr><th>ROTASACA</th><th>ROTA</th><th>ROTASACAPL</th><th>AGENCIA</th><th>VEICULO</th><th>QR</th></tr>';
+    var numToGroup = {};
+    state.groups.forEach(function (g) { (g.realSacas || []).forEach(function (n) { numToGroup[n] = g.name; }); });
+    body.innerHTML = nums.map(function (n) {
+      var m = state.metaByNum[n] || {};
+      return '<tr><td>' + n + '</td><td>' + esc(numToGroup[n] || '') + '</td><td>' + esc(m.rotasacapl || '') +
+        '</td><td>' + esc(m.agencia || '') + '</td><td>' + esc(m.veiculo || '') + '</td><td>' +
+        (state.qrByNum[n] ? '✓' : '—') + '</td></tr>';
+    }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text-2);padding:24px">Sem dados de extração. Importe a extração (QR).</td></tr>';
+    $('extracaoFoot').textContent = nums.length + (state.lang === 'pt' ? ' sacas na extração.' : ' sacas en la extración.');
+    $('extracaoOverlay').classList.add('open');
+  }
+
+  // ---------------------------------------------------------------- print
+  function printSelection() {
+    var fmt = $('formatSelect').value;
+    var items = [];
+    var numToGroup = {};
+    state.groups.forEach(function (g) { (g.realSacas || []).forEach(function (n) { numToGroup[n] = g; }); });
+    state.selection.slice().sort(function (a, b) { return a - b; }).forEach(function (num) {
+      var g = numToGroup[num]; if (!g) return;
+      items.push({ num: num, route: g.name, qr: state.qrByNum[num] || '' });
+    });
+    if (!items.length) return;
+
+    var area = $('print-area');
+    var html = '';
+    if (fmt === 'cartao') {
+      for (var i = 0; i < items.length; i += 4) {
+        var chunk = items.slice(i, i + 4);
+        html += '<div class="print-page"><div class="print-grid">';
+        chunk.forEach(function (it) {
+          html += '<div class="card-et"><div class="c-num"><h1>' + esc(it.num) + '</h1></div>' +
+            '<div class="c-route"><h2>' + esc(it.route) + '</h2></div>' +
+            '<div class="c-qr" data-qr="' + esc(it.qr) + '"></div></div>';
+        });
+        for (var j = chunk.length; j < 4; j++) html += '<div class="card-et empty"></div>';
+        html += '</div></div>';
+      }
+    } else {
+      items.forEach(function (it) {
+        html += '<div class="print-page"><div class="print-grid">' +
+          '<div class="card-et" style="width:150mm;height:200mm"><div class="c-num" style="height:100mm"><h1 style="font-size:160pt">' + esc(it.num) + '</h1></div>' +
+          '<div class="c-route" style="height:34mm"><h2 style="font-size:70pt">' + esc(it.route) + '</h2></div>' +
+          '<div class="c-qr" data-qr="' + esc(it.qr) + '"></div></div>' +
+          '</div></div>';
+      });
+    }
+    area.innerHTML = html;
+
+    area.querySelectorAll('.c-qr').forEach(function (el) {
+      var txt = el.getAttribute('data-qr'); if (!txt) return;
+      var qr = window.qrcode(0, 'M'); qr.addData(txt); qr.make();
+      el.innerHTML = qr.createSvgTag({ cellSize: 3, margin: 2, scalable: true });
+    });
+
+    setTimeout(function () {
+      window.print();
+      setTimeout(function () { area.innerHTML = ''; }, 800);
+    }, 350);
+  }
+
+  // ---------------------------------------------------------------- wiring
   document.addEventListener('DOMContentLoaded', function () {
-    document.querySelectorAll('nav.tabs button[data-tab]').forEach(function (btn) {
-      btn.addEventListener('click', function () { switchTab(btn.getAttribute('data-tab')); });
-    });
+    $('btnAnexar').addEventListener('click', function () { chooseFile('opt'); });
+    $('btnAnexar2').addEventListener('click', function () { chooseFile('opt'); });
+    $('btnExtracao').addEventListener('click', function () { chooseFile('extr'); });
+    $('btnExtracao2').addEventListener('click', function () { chooseFile('extr'); });
+    $('btnRecuperar').addEventListener('click', restoreSaved);
+    $('btnRecuperar2').addEventListener('click', restoreSaved);
+    $('btnLimparOtim').addEventListener('click', clearOptimization);
 
-    document.getElementById('fileInput').addEventListener('change', function (e) {
-      if (e.target.files && e.target.files[0]) handleFileSelect(e.target.files[0]);
+    $('searchInput').addEventListener('input', renderRoutes);
+    $('btnSelAll').addEventListener('click', selectAllVisible);
+    $('btnClearSel').addEventListener('click', function () { state.selection = []; persist(); renderRoutes(); updatePrintBar(); });
+    $('btnRestore').addEventListener('click', function () {
+      state.excluded = []; persist(); renderRoutes(); updatePrintBar();
+      toast(state.lang === 'pt' ? 'Sacas restauradas!' : '¡Sacas restauradas!', true);
     });
+    $('btnVerExtracao').addEventListener('click', openExtracao);
+    $('closeExtracao').addEventListener('click', function () { $('extracaoOverlay').classList.remove('open'); });
+    $('extracaoOverlay').addEventListener('click', function (e) { if (e.target === this) this.classList.remove('open'); });
 
-    document.getElementById('colsSelect').addEventListener('change', renderLabels);
-    document.getElementById('printBtn').addEventListener('click', function () { window.print(); });
-    document.getElementById('markPrintedBtn').addEventListener('click', markAllPrinted);
+    $('btnSalvar').addEventListener('click', saveChoice);
+    $('btnPrint').addEventListener('click', printSelection);
+
+    $('siteSelect').addEventListener('change', function () { state.site = this.value; persist(); });
+    $('langSelect').addEventListener('change', function () { state.lang = this.value; persist(); applyLang(); render(); });
 
     init();
   });

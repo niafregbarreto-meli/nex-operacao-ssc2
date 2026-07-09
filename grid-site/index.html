@@ -3,80 +3,120 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Nex SSC2 — Pré-triagem</title>
+<title>GESTÃO NEX — SSC2</title>
 <link rel="stylesheet" href="assets/app.css">
 </head>
 <body>
 
+<div id="toast" class="toast"></div>
+
 <header class="app-header">
-  <div>
-    <h1>Nex — Operação SSC2 (Biguaçu)</h1>
-    <div class="subtitle">Pré-sorting: separação → sacas → QR de estação</div>
-  </div>
-  <span id="storageBadge" class="storage-badge">—</span>
-</header>
-
-<nav class="tabs">
-  <button data-tab="import" class="active">1. Importar</button>
-  <button data-tab="assign">2. Asignar sacas</button>
-  <button data-tab="qr">3. QR de estação</button>
-  <button data-tab="sorting">4. Sorting</button>
-  <button data-tab="postsorting">5. Post-sorting</button>
-</nav>
-
-<main>
-
-  <section id="screen-import" class="screen active">
-    <div class="card">
-      <h2>1. Subir arquivo de separação</h2>
-      <p class="muted">Subí el CSV exportado del sistema de separación. Va a decirte cuántas sacas tiene cada ruta y cuáles son híbridas.</p>
-      <input type="file" id="fileInput" accept=".csv,text/csv">
-    </div>
-    <div id="importAlert" class="card" style="display:none"></div>
-    <div id="mappingWrap"></div>
-  </section>
-
-  <section id="screen-assign" class="screen">
-    <div class="card">
-      <h2>2. Asignar sacas físicas por ruta</h2>
-      <p class="muted">Cada ruta hija ocupa entre 1 y 6 sacas físicas (a veces más, por excepcionalidad). Agregá o quitá sacas según lo que realmente vas a usar en la estación.</p>
-    </div>
-    <div id="routesWrap"></div>
-  </section>
-
-  <section id="screen-qr" class="screen">
-    <div class="card no-print">
-      <h2>3. QR Codes de estación</h2>
-      <div class="field-row" style="align-items:center">
-        <label>Etiquetas por fila
-          <select id="colsSelect">
-            <option value="2">2</option>
-            <option value="3" selected>3</option>
-            <option value="4">4</option>
-          </select>
-        </label>
-        <button class="btn" id="printBtn">Imprimir</button>
-        <button class="btn secondary" id="markPrintedBtn">Marcar todo como impreso</button>
+  <div class="header-top">
+    <div class="brand">
+      <div class="logo">NEX</div>
+      <div>
+        <h1>GESTÃO NEX</h1>
+        <div class="sub">Operação SSC2 · Biguaçu</div>
       </div>
     </div>
-    <div id="labelsWrap"></div>
-  </section>
-
-  <section id="screen-sorting" class="screen">
-    <div class="placeholder">
-      <h2>Sorting</h2>
-      <p>Próximamente: acá va a vivir la lógica que, ~1h después de iniciada la triagem, capta qué saca física quedó en cada ruta/estación y permite imprimir el QR final de la saca.</p>
+    <div class="header-right">
+      <span class="pill"><label data-i18n="site">Site</label><select id="siteSelect"><option value="SSC2">SSC2</option></select></span>
+      <a class="pill" id="bagsLink" href="https://envios.adminml.com/logistics/sorting/bags" target="_blank" rel="noopener" style="text-decoration:none" data-i18n="avail_bags">Sacas disponíveis ↗</a>
+      <span class="pill"><label>Idioma</label><select id="langSelect"><option value="pt">PT-BR</option><option value="es">ES</option></select></span>
+      <span id="storageBadge" class="storage-badge">—</span>
     </div>
-  </section>
+  </div>
 
-  <section id="screen-postsorting" class="screen">
-    <div class="placeholder">
-      <h2>Post-sorting</h2>
-      <p>Próximamente: revisión/auditoría de la saca y cierre antes del despacho.</p>
+  <div class="header-tools" id="headerTools">
+    <span class="group-label" data-i18n="optimization">Otimização</span>
+    <button class="tool-link" id="btnAnexar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15.17 7l-6.58 6.59a2 2 0 102.82 2.82l6.42-6.58a4 4 0 00-5.66-5.66l-6.41 6.59a6 6 0 108.48 8.48L20.5 13"/></svg><span data-i18n="attach_csv">Anexar CSV</span></button>
+    <button class="tool-link" id="btnExtracao"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7v10c0 2.2 3.58 4 8 4s8-1.8 8-4V7M4 7c0 2.2 3.58 4 8 4s8-1.8 8-4M4 7c0-2.2 3.58-4 8-4s8 1.8 8 4"/></svg><span data-i18n="load_extr">Extração (QR)</span></button>
+    <button class="tool-link" id="btnRecuperar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h5M4 9a8 8 0 113 6"/></svg><span data-i18n="load_saved">Recuperar salvo</span></button>
+
+    <span id="activeFile" class="active-file" style="display:none">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 21h10a2 2 0 002-2V9.41a1 1 0 00-.29-.7l-5.41-5.42A1 1 0 0012.59 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+      <span id="activeFileName">—</span>
+      <button class="x" id="btnLimparOtim" title="Remover">&times;</button>
+    </span>
+
+    <input type="file" id="fileInput" accept=".csv,.tsv,text/csv" style="display:none">
+  </div>
+</header>
+
+<main>
+  <!-- Empty state -->
+  <section id="emptyState" class="empty-state">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.59a1 1 0 01.7.29l5.42 5.42a1 1 0 01.29.7V19a2 2 0 01-2 2z"/></svg>
+    <div class="kicker" data-i18n="import_kicker">Importe o arquivo de</div>
+    <h2><span data-i18n="optimization_up">OTIMIZAÇÃO</span> <small>(CSV)</small></h2>
+    <div class="actions">
+      <button class="btn loud" id="btnAnexar2" data-i18n="attach_csv">Anexar CSV</button>
+      <button class="btn quiet" id="btnRecuperar2" data-i18n="load_saved">Recuperar salvo</button>
+      <button class="btn purple" id="btnExtracao2" data-i18n="load_extr">Extração (QR)</button>
     </div>
+    <p data-i18n="opt_desc">A otimização define quais sacas pertencem a cada rota. A extração traz o QR real de cada saca para impressão.</p>
   </section>
 
+  <!-- Main grid -->
+  <section id="gridWrapper" style="display:none">
+    <div class="toolbar">
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        <input type="text" id="searchInput" placeholder="Buscar rota (ex: G1)…">
+      </div>
+      <button class="btn ghost sm" id="btnSelAll" data-i18n="sel_all">Sel. todos</button>
+      <button class="btn ghost sm" id="btnClearSel" data-i18n="clear_sel">Limpar seleção</button>
+      <button class="btn warn-ghost sm" id="btnRestore" data-i18n="restore">Restaurar excluídas</button>
+      <div class="spacer"></div>
+      <button class="btn purple sm" id="btnVerExtracao" data-i18n="view_extr">Dados extração</button>
+    </div>
+
+    <div class="toolbar second">
+      <button class="btn loud sm" id="btnSalvar" data-i18n="save_choice">Salvar escolha de sacas</button>
+      <span class="last-save" id="lastSave"></span>
+      <div class="spacer"></div>
+      <span class="count-chip"><b id="printCount">0</b> <span data-i18n="copies">cópias</span></span>
+      <select class="native" id="formatSelect">
+        <option value="cartao">CARTÃO (4x1)</option>
+        <option value="folha">FOLHA (1x1)</option>
+      </select>
+      <button class="btn loud sm" id="btnPrint" disabled data-i18n="print">Imprimir</button>
+    </div>
+
+    <div class="routes-wrap" id="routesWrap"></div>
+  </section>
 </main>
+
+<!-- Extraction viewer modal -->
+<div class="overlay" id="extracaoOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 data-i18n="extr_title">Dados da Extração NEX</h2>
+      <button class="close" id="closeExtracao">&times;</button>
+    </div>
+    <div class="modal-body">
+      <table class="data"><thead id="extracaoHead"></thead><tbody id="extracaoBody"></tbody></table>
+    </div>
+    <div class="modal-foot"><span class="hint" id="extracaoFoot"></span></div>
+  </div>
+</div>
+
+<!-- Import mapping modal -->
+<div class="overlay" id="importOverlay">
+  <div class="modal sm">
+    <div class="modal-head">
+      <h2 id="importTitle">Importar</h2>
+      <button class="close" id="closeImport">&times;</button>
+    </div>
+    <div class="modal-body pad" id="importBody"></div>
+    <div class="modal-foot">
+      <button class="btn ghost" id="cancelImport" data-i18n="cancel">Cancelar</button>
+      <button class="btn loud" id="confirmImport" data-i18n="import_btn">Importar</button>
+    </div>
+  </div>
+</div>
+
+<div id="print-area"></div>
 
 <script src="assets/qrcode.js"></script>
 <script src="assets/grid-shim.js"></script>
