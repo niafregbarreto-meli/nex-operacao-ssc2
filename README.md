@@ -70,6 +70,17 @@ O QR nunca é inventado: vem pré-impresso pela plataforma oficial
 extração BigQuery. Fonte da query em `docs/` da conversa
 (`SHIPPING_SORTING_HISTORY` → `CONTAINER_QR` JSON).
 
+### "+ QR adicional" — planilha de "salvados" como fonte extra
+
+A planilha de "salvados" do Apps Script antigo (`NUMERO_NEX`, `CÓDIGO QR`
+fixos; `ROTAPL`/`ROTAOT` que mudam a diário ao subir a otimização) **não**
+é usada para criar/atualizar rotas — só como fallback para tapar buracos de
+QR em sacas que **já existem** nas rotas carregadas (via "Anexar CSV" ou
+"Extração (QR)"). Nunca sobrescreve um QR que já tem, nunca cria rota nova.
+Botão "+ QR adicional" no cabeçalho, aceita `NUMERO_NEX`/`ROTASACA` +
+`CÓDIGO QR`/`CONTAINER_QR` (ou `CONTAINER_ID`, reconstruindo o JSON).
+Testado: idempotente (reimportar não duplica nem some com nada).
+
 ## Rodar localmente
 
 ```bash

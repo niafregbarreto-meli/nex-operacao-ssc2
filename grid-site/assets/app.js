@@ -28,7 +28,7 @@
   var I18N = {
     pt: {
       site: 'Site', avail_bags: 'Sacas disponíveis ↗', optimization: 'Otimização',
-      attach_csv: 'Anexar CSV', load_extr: 'Extração (QR)', load_saved: 'Recuperar salvo',
+      attach_csv: 'Anexar CSV', load_extr: 'Extração (QR)', load_qr_extra: '+ QR adicional', load_saved: 'Recuperar salvo',
       import_kicker: 'Importe o arquivo de', optimization_up: 'OTIMIZAÇÃO',
       opt_desc: 'A otimização define quais sacas pertencem a cada rota. A extração traz o QR real, a agência e o modal de cada saca.',
       sel_all: 'Sel. todos', clear_sel: 'Limpar seleção', restore: 'Restaurar excluídas',
@@ -45,7 +45,7 @@
     },
     es: {
       site: 'Sitio', avail_bags: 'Sacas disponibles ↗', optimization: 'Optimización',
-      attach_csv: 'Adjuntar CSV', load_extr: 'Extração (QR)', load_saved: 'Recuperar guardado',
+      attach_csv: 'Adjuntar CSV', load_extr: 'Extração (QR)', load_qr_extra: '+ QR adicional', load_saved: 'Recuperar guardado',
       import_kicker: 'Importá el archivo de', optimization_up: 'OPTIMIZACIÓN',
       opt_desc: 'La optimización define qué sacas pertenecen a cada ruta. La extração trae el QR real, la agencia y el modal de cada saca.',
       sel_all: 'Sel. todos', clear_sel: 'Limpiar selección', restore: 'Restaurar excluidas',
@@ -150,7 +150,9 @@
         pending = { kind: kind, headers: rows[0].map(function (h) { return h.trim(); }),
           rows: rows.slice(1).filter(function (r) { return r.some(function (v) { return v.trim() !== ''; }); }),
           fileName: file.name };
-        if (kind === 'opt') importOptimization(); else importExtracao();
+        if (kind === 'opt') importOptimization();
+        else if (kind === 'qrfb') importQrFallback();
+        else importExtracao();
       };
       reader.readAsText(file, 'UTF-8');
     };
@@ -241,6 +243,44 @@
     var msg = groups.length + (state.lang === 'pt' ? ' rotas' : ' rutas') + ' · ' + Object.keys(qr).length + ' QR';
     if (skipped) msg += ' (' + skipped + (state.lang === 'pt' ? ' linhas de rota/CHP ignoradas' : ' filas de ruta/CHP ignoradas') + ')';
     toast(msg, true);
+  }
+
+  // "Salvados" sheet (NUMERO_NEX + CÓDIGO QR fixos, ROTAPL/ROTAOT mudam a diário
+  // e por isso NÃO são confiáveis aqui) — só tapa buracos de QR em sacas que já
+  // existem nas rotas carregadas. Nunca cria/edita rotas nem pisa um QR que já tem.
+  function importQrFallback() {
+    var h = pending.headers;
+    var iNum = col(h, ['NUMERO_NEX', 'ROTASACA']);
+    var iQr = col(h, ['CÓDIGO QR', 'CODIGO QR', 'CONTAINER_QR', 'CODIGO', 'QR']);
+    var iCid = col(h, ['CONTAINER_ID']);
+    if (iNum === -1) { toast('CSV inválido: falta a coluna NUMERO_NEX/ROTASACA.', false); return; }
+    if (iQr === -1 && iCid === -1) { toast('CSV inválido: falta CÓDIGO QR/CONTAINER_QR ou CONTAINER_ID.', false); return; }
+
+    var knownNums = {};
+    state.groups.forEach(function (g) { (g.realSacas || []).forEach(function (n) { knownNums[n] = true; }); });
+
+    var filled = 0, already = 0, notFound = 0;
+    pending.rows.forEach(function (r) {
+      var numRaw = String(r[iNum] || '').trim();
+      if (!/^\d+$/.test(numRaw)) return;
+      var num = parseInt(numRaw, 10);
+      if (!knownNums[num]) { notFound++; return; }
+      if (state.qrByNum[num]) { already++; return; }
+      var qrStr = iQr !== -1 ? String(r[iQr] || '').trim() : '';
+      if (!qrStr && iCid !== -1 && String(r[iCid] || '').trim()) {
+        var cid = parseInt(r[iCid], 10);
+        qrStr = JSON.stringify({ container_id: isNaN(cid) ? String(r[iCid]).trim() : cid, facility_id: state.site, assignment: numRaw });
+      }
+      if (!qrStr) return;
+      state.qrByNum[num] = qrStr;
+      filled++;
+    });
+
+    pending = null; persist(); render();
+    var msg = filled + (state.lang === 'pt' ? ' QR completados' : ' QR completados');
+    if (already) msg += ' · ' + already + (state.lang === 'pt' ? ' já tinham' : ' ya tenían');
+    if (notFound) msg += ' · ' + notFound + (state.lang === 'pt' ? ' não pertencem a rotas atuais' : ' no pertenecen a rutas actuales');
+    toast(msg, filled > 0);
   }
 
   function clearOptimization() {
@@ -462,6 +502,7 @@
   document.addEventListener('DOMContentLoaded', function () {
     ['btnAnexar', 'btnAnexar2'].forEach(function (id) { $(id).addEventListener('click', function () { chooseFile('opt'); }); });
     ['btnExtracao', 'btnExtracao2', 'btnBannerExtr'].forEach(function (id) { $(id).addEventListener('click', function () { chooseFile('extr'); }); });
+    $('btnQrFallback').addEventListener('click', function () { chooseFile('qrfb'); });
     ['btnRecuperar', 'btnRecuperar2'].forEach(function (id) { $(id).addEventListener('click', restoreSaved); });
     $('btnLimparOtim').addEventListener('click', clearOptimization);
 
