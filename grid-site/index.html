@@ -20,30 +20,20 @@
       </div>
     </div>
     <div class="header-right">
+      <a class="pill" id="bagsLink" href="https://envios.adminml.com/logistics/sorting/sacas" target="_blank" rel="noopener" style="text-decoration:none" data-i18n="avail_bags">Sacas disponíveis ↗</a>
       <span class="pill"><label data-i18n="site">Site</label><select id="siteSelect"><option value="SSC2">SSC2</option></select></span>
-      <a class="pill" id="bagsLink" href="https://envios.adminml.com/logistics/sorting/bags" target="_blank" rel="noopener" style="text-decoration:none" data-i18n="avail_bags">Sacas disponíveis ↗</a>
-      <span class="pill"><label>Idioma</label><select id="langSelect"><option value="pt">PT-BR</option><option value="es">ES</option></select></span>
-      <span id="storageBadge" class="storage-badge">—</span>
+      <button class="pill icon-btn" id="btnSettings" title="Configurações">⚙</button>
     </div>
   </div>
 
-  <div class="header-tools" id="headerTools">
-    <span class="group-label" data-i18n="optimization">Otimização</span>
-    <button class="tool-link" id="btnAnexar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15.17 7l-6.58 6.59a2 2 0 102.82 2.82l6.42-6.58a4 4 0 00-5.66-5.66l-6.41 6.59a6 6 0 108.48 8.48L20.5 13"/></svg><span data-i18n="attach_csv">Anexar CSV</span></button>
-    <button class="tool-link" id="btnRecuperar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h5M4 9a8 8 0 113 6"/></svg><span data-i18n="load_saved">Recuperar salvo</span></button>
-
-    <span class="group-label" style="margin-left:8px" data-i18n="extraction">Extração (QR)</span>
-    <button class="tool-link purple" id="btnSyncSheet"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.58M4.06 13a8 8 0 0015.4 2M20 20v-5h-.58M19.94 11a8 8 0 00-15.4-2"/></svg><span data-i18n="sync_now">Atualizar planilha</span></button>
-    <span id="syncStatus" class="hint" style="font-size:11px"></span>
-    <button class="tool-link" id="btnExtracao" title="Alternativa manual: subir o CSV da extração à mão" data-i18n="manual_csv">CSV manual</button>
-    <button class="tool-link" id="btnQrFallback" title="Completar QR de sacas que já existem, sem tocar rotas"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v16m8-8H4"/></svg><span data-i18n="load_qr_extra">+ QR adicional</span></button>
-
+  <!-- slim status strip: só o arquivo ativo + estado do QR, quando há rotas -->
+  <div class="header-tools" id="headerTools" style="display:none">
     <span id="activeFile" class="active-file" style="display:none">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 21h10a2 2 0 002-2V9.41a1 1 0 00-.29-.7l-5.41-5.42A1 1 0 0012.59 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
       <span id="activeFileName">—</span>
-      <button class="x" id="btnLimparOtim" title="Remover">&times;</button>
+      <button class="x" id="btnTrocarOtim" title="Trocar otimização" data-i18n="upload_opt">Trocar</button>
     </span>
-
+    <span id="syncStatus" class="hint" style="font-size:12px; display:none"></span>
     <input type="file" id="fileInput" accept=".csv,.tsv,text/csv" style="display:none">
   </div>
 </header>
@@ -55,7 +45,7 @@
     <div class="kicker" data-i18n="import_kicker">Importe o arquivo de</div>
     <h2><span data-i18n="optimization_up">OTIMIZAÇÃO</span> <small>(CSV)</small></h2>
     <div class="actions">
-      <button class="btn loud" id="btnAnexar2" data-i18n="attach_csv">Anexar CSV</button>
+      <button class="btn loud" id="btnAnexar2" data-i18n="upload_opt">Subir otimização</button>
       <button class="btn quiet" id="btnRecuperar2" data-i18n="load_saved">Recuperar salvo</button>
     </div>
     <p data-i18n="opt_desc">A otimização define quais sacas pertencem a cada rota. O QR real chega automaticamente da planilha de extração — não precisa subir nada para isso.</p>
@@ -66,7 +56,7 @@
     <div id="baseBanner" class="banner" style="display:none">
       <span id="baseBannerMsg"></span>
       <span class="spacer"></span>
-      <button class="btn quiet sm" id="btnBannerExtr" data-i18n="sync_now">Atualizar planilha</button>
+      <button class="btn quiet sm" id="btnBannerExtr" data-i18n="sync_now">Atualizar QR</button>
     </div>
     <div class="toolbar">
       <div class="search">
@@ -76,8 +66,6 @@
       <button class="btn ghost sm" id="btnSelAll" data-i18n="sel_all">Sel. todos</button>
       <button class="btn ghost sm" id="btnClearSel" data-i18n="clear_sel">Limpar seleção</button>
       <button class="btn warn-ghost sm" id="btnRestore" data-i18n="restore">Restaurar excluídas</button>
-      <div class="spacer"></div>
-      <button class="btn purple sm" id="btnVerExtracao" data-i18n="view_extr">Dados extração</button>
     </div>
 
     <div class="toolbar second">
@@ -126,18 +114,32 @@
   </div>
 </div>
 
-<!-- Import mapping modal -->
-<div class="overlay" id="importOverlay">
-  <div class="modal sm">
-    <div class="modal-head">
-      <h2 id="importTitle">Importar</h2>
-      <button class="close" id="closeImport">&times;</button>
+<!-- Settings / advanced / diagnostics modal -->
+<div class="overlay" id="settingsOverlay">
+  <div class="modal">
+    <div class="modal-head"><h2 data-i18n="settings">Configurações</h2><button class="close" id="closeSettings">&times;</button></div>
+    <div class="modal-body pad">
+      <div class="field">
+        <label data-i18n="qr_base_url">URL da base de QR (CSV publicado)</label>
+        <input type="text" id="setQrUrl" spellcheck="false">
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px">
+        <button class="btn loud sm" id="btnTestConn" data-i18n="test_conn">Testar / atualizar agora</button>
+        <span class="pill"><label>Idioma</label><select id="langSelect"><option value="pt">PT-BR</option><option value="es">ES</option></select></span>
+        <span id="storageBadge" class="storage-badge">—</span>
+      </div>
+
+      <h3 style="font-size:12px; text-transform:uppercase; letter-spacing:.5px; color:var(--text-2); margin:8px 0 6px" data-i18n="diag">Diagnóstico</h3>
+      <div id="diagBox" class="diag-box"></div>
+
+      <h3 style="font-size:12px; text-transform:uppercase; letter-spacing:.5px; color:var(--text-2); margin:18px 0 6px" data-i18n="advanced">Avançado</h3>
+      <div style="display:flex; gap:8px; flex-wrap:wrap">
+        <button class="btn quiet sm" id="btnExtracao" data-i18n="manual_csv">CSV manual (avançado)</button>
+        <button class="btn quiet sm" id="btnQrFallback" data-i18n="load_qr_extra">+ QR adicional</button>
+        <button class="btn quiet sm" id="btnVerExtracao" data-i18n="view_extr">Dados extração</button>
+      </div>
     </div>
-    <div class="modal-body pad" id="importBody"></div>
-    <div class="modal-foot">
-      <button class="btn ghost" id="cancelImport" data-i18n="cancel">Cancelar</button>
-      <button class="btn loud" id="confirmImport" data-i18n="import_btn">Importar</button>
-    </div>
+    <div class="modal-foot"><button class="btn ghost" id="cancelSettings" data-i18n="close">Fechar</button><button class="btn loud" id="saveSettings" data-i18n="save">Salvar</button></div>
   </div>
 </div>
 

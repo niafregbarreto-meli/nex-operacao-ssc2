@@ -1,14 +1,21 @@
 (function () {
   'use strict';
 
-  var SCHEMA_VERSION = 5;
+  var SCHEMA_VERSION = 6;
 
-  // Planilha "SSC2 BASE 2026" — aba SEPARACAO_NEX (saída da query Q_SEPARACAO).
-  // Lida em tempo real via Grid.sheets.get() quando o app corre dentro do Grid
-  // e o dono do documento tem o Google conectado (Sheets). Editável aqui se a
-  // planilha ou a aba mudar de nome/ID no futuro.
+  // ---- Fonte automática do QR (base publicada, atualizada por query diária) ----
+  // CSV publicado (Arquivo → Publicar na web) — NÃO precisa de OAuth Google,
+  // é um GET público. É a forma mais simples e robusta de trazer o CONTAINER_QR
+  // de cada saca sem o operador subir nada. Editável no ⚙ (Configurações) se
+  // a aba/planilha mudar.
+  var DEFAULT_QR_BASE_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ5DW6wEKmJICM9ijwUQR_06YYJNLiXFSjzDiPd04WcXcgoRRz2kW8h8LyCxeMEnxvvcOKnYGhwJa2f/pub?gid=1505849780&single=true&output=csv';
+  // Fallback via SDK do Grid (precisa Google conectado no Grid) — usado só se o
+  // fetch do CSV publicado for bloqueado por CSP no iframe do Grid.
   var GRID_SHEET_ID = '1w31lqax56lMcjbvoj5VhdDf9gwEYSh2ldjMuTb9WV8Y';
-  var GRID_SHEET_TAB = 'SEPARACAO_NEX';
+  var GRID_SHEET_TABS = ['SEPARACAO_NEX', 'EXTRACAO', 'Extração', 'EXTRAÇÃO'];
+
+  // Diagnóstico da última tentativa de carga da base (mostrado no ⚙).
+  var qrDiag = { attempts: [] };
 
   function defaultState() {
     return {
@@ -20,6 +27,7 @@
       optFileName: null,
       lastSave: null,
       lastSheetSync: null,
+      qrBaseUrl: DEFAULT_QR_BASE_URL,
       groups: [],              // { name, fullName, planned, hybrid, count, realSacas:[num] }
       excluded: [],
       selection: [],
@@ -50,11 +58,12 @@
       base_missing: 'Sem QR na base — clique em "Atualizar planilha" ou verifique a conexão com o Google no Grid.',
       base_partial: 'sacas ainda sem QR na planilha.',
       base_ok: 'Todas as sacas têm QR real.',
-      extraction: 'Extração (QR)', sync_now: 'Atualizar planilha', manual_csv: 'CSV manual',
-      sync_syncing: 'Sincronizando planilha…', sync_ok: 'Sincronizado às ',
-      sync_not_grid: 'Fora do Grid — sem acesso à planilha. Use "CSV manual".',
-      sync_no_api: 'Este Grid ainda não tem Grid.sheets — conecte o Google (Grid → conectar Google) ou use "CSV manual".',
-      sync_fail: 'Falha ao ler a planilha — verifique se o Google está conectado no Grid. Detalhe: '
+      extraction: 'Extração (QR)', sync_now: 'Atualizar QR', manual_csv: 'CSV manual (avançado)',
+      sync_syncing: 'Buscando QR…', sync_ok: 'QR OK · ',
+      sync_fail_all: 'Não consegui trazer o QR automaticamente. Veja Configurações ⚙ → Diagnóstico.',
+      sync_no_qr_cols: 'Base lida, mas sem coluna de QR (CONTAINER_QR/CONTAINER_ID). Veja ⚙ → Diagnóstico.',
+      settings: 'Configurações', advanced: 'Avançado', diag: 'Diagnóstico', qr_base_url: 'URL da base de QR (CSV publicado)',
+      test_conn: 'Testar / atualizar agora', no_diag: 'Nenhuma tentativa ainda.', close: 'Fechar', upload_opt: 'Subir otimização'
     },
     es: {
       site: 'Sitio', avail_bags: 'Sacas disponibles ↗', optimization: 'Optimización',
@@ -72,11 +81,12 @@
       base_missing: 'Sin QR en la base — hacé clic en "Actualizar planilla" o revisá la conexión con Google en Grid.',
       base_partial: 'sacas todavía sin QR en la planilla.',
       base_ok: 'Todas las sacas tienen QR real.',
-      extraction: 'Extração (QR)', sync_now: 'Actualizar planilla', manual_csv: 'CSV manual',
-      sync_syncing: 'Sincronizando planilla…', sync_ok: 'Sincronizado a las ',
-      sync_not_grid: 'Fuera de Grid — sin acceso a la planilla. Usá "CSV manual".',
-      sync_no_api: 'Este Grid todavía no tiene Grid.sheets — conectá Google (Grid → conectar Google) o usá "CSV manual".',
-      sync_fail: 'Falló la lectura de la planilla — revisá si Google está conectado en Grid. Detalle: '
+      extraction: 'Extração (QR)', sync_now: 'Actualizar QR', manual_csv: 'CSV manual (avanzado)',
+      sync_syncing: 'Buscando QR…', sync_ok: 'QR OK · ',
+      sync_fail_all: 'No pude traer el QR automáticamente. Mirá Configuración ⚙ → Diagnóstico.',
+      sync_no_qr_cols: 'Base leída, pero sin columna de QR (CONTAINER_QR/CONTAINER_ID). Mirá ⚙ → Diagnóstico.',
+      settings: 'Configuración', advanced: 'Avanzado', diag: 'Diagnóstico', qr_base_url: 'URL de la base de QR (CSV publicado)',
+      test_conn: 'Probar / actualizar ahora', no_diag: 'Ninguna tentativa aún.', close: 'Cerrar', upload_opt: 'Subir optimización'
     }
   };
   function t(k) { return (I18N[state.lang] && I18N[state.lang][k]) || I18N.pt[k] || k; }
@@ -134,13 +144,15 @@
     syncFromSheet(true); // silencioso: não pisa a tela com erro num primeiro load
   }
 
-  // ---------------------------------------------------------------- Google Sheet auto-sync
+  // ---------------------------------------------------------------- QR base auto-load
   //
-  // IMPORTANT: the Sheets API lives on `window.Grid` (mixed case, loaded via
-  // /d/_assets/grid-sdk.js + Grid.configure({docId})) — NOT on the auto-injected
-  // `window.GRID` (all caps), which only carries .state/.states. Mixing these
-  // up silently disables the sync (looks like "not available" instead of an
-  // actual error), so the check below is deliberately on `window.Grid`.
+  // O QR de cada saca vem sozinho de uma base publicada (query diária). Duas
+  // vias, tentadas em ordem, primeiro sucesso ganha:
+  //   1) fetch() do CSV publicado — GET público, SEM OAuth. É a que a URL do
+  //      usuário aponta e a mais simples. Pode ser bloqueada por CSP no iframe.
+  //   2) Grid.sheets.get() — SDK do Grid (precisa Google conectado). Sanctioned.
+  // Se as duas falharem, resta o CSV manual (no ⚙). Cada tentativa fica em
+  // qrDiag para o painel de diagnóstico mostrar exatamente o que voltou.
   var gridConfigured = false;
 
   function getGridDocId() {
@@ -151,7 +163,6 @@
     } catch (e) { /* ignore */ }
     return null;
   }
-
   function ensureGridSheetsReady() {
     if (gridConfigured) return true;
     if (!(window.Grid && typeof window.Grid.configure === 'function' && window.Grid.sheets)) return false;
@@ -166,19 +177,16 @@
     var el = $('syncStatus'); if (!el) return;
     el.textContent = msg || '';
     el.style.color = kind === 'err' ? 'var(--error)' : kind === 'ok' ? 'var(--success)' : 'var(--text-2)';
+    el.style.display = msg ? 'inline' : 'none';
   }
 
-  // Grid.sheets.get() shape varies by version — cobre os 4 formatos documentados.
   function extractRows(result) {
     if (Array.isArray(result)) return result;
     if (result && Array.isArray(result.values)) return result.values;
     if (result && Array.isArray(result.rows)) return result.rows;
-    if (result && result.sheets && Array.isArray(result.sheets[GRID_SHEET_TAB])) return result.sheets[GRID_SHEET_TAB];
+    if (result && result.sheets) { for (var k in result.sheets) { if (Array.isArray(result.sheets[k])) return result.sheets[k]; } }
     return null;
   }
-
-  // Converte as linhas (array de arrays com header na 1ª linha, ou array de
-  // objetos) para {headers, rows}.
   function normalizeSheetRows(data) {
     var rows = extractRows(data);
     if (!rows || !rows.length) return null;
@@ -197,45 +205,148 @@
     return null;
   }
 
-  // Tenta o nome do tab puro primeiro (funciona na maioria dos casos); se
-  // falhar, tenta A1 notation completa — variação documentada da mesma API.
-  async function fetchSheetData() {
-    try {
-      return await window.Grid.sheets.get(GRID_SHEET_ID, GRID_SHEET_TAB);
-    } catch (err) {
-      try {
-        return await window.Grid.sheets.get(GRID_SHEET_ID, GRID_SHEET_TAB + '!A:Z');
-      } catch (err2) {
-        throw err; // reporta o erro original, mais provável de ser o real
+  // Aplica a base ao estado. Preenche qrByNum/metaByNum por número de saca.
+  // Se ainda não há rotas (otimização não subida) E a base traz rota (ROTAOT com
+  // letra), constrói os grupos a partir dela. Caso contrário, só preenche QR/meta
+  // — nunca reseta seleção/exclusão do operador.
+  function applyQrBase(parsed) {
+    var h = parsed.headers;
+    var iNum = col(h, ['ROTASACA', 'SACA', 'NUMERO_NEX']);
+    var iOt = col(h, ['ROTAOT', 'ID OTIMIZADO', 'ROTA']);
+    var iPl = col(h, ['ROTAPL', 'ID PLANEJADO']);
+    var iQr = col(h, ['CONTAINER_QR', 'CÓDIGO QR', 'CODIGO QR', 'CODIGO', 'QR']);
+    var iCid = col(h, ['CONTAINER_ID']);
+    var iCode = col(h, ['ROTASACAPL']);
+    var iAg = col(h, ['AGENCIA', 'AGÊNCIA']);
+    var iVe = col(h, ['VEICULO', 'VEÍCULO', 'MODAL']);
+
+    // número da saca: ROTASACA se existir; senão a coluna de rota que for numérica.
+    function sacaNumOf(r) {
+      if (iNum !== -1 && /^\d+$/.test(String(r[iNum] || '').trim())) return parseInt(r[iNum], 10);
+      if (iOt !== -1 && /^\d+$/.test(String(r[iOt] || '').trim())) return parseInt(r[iOt], 10);
+      return null;
+    }
+    function routeOf(r) {
+      var v = iOt !== -1 ? String(r[iOt] || '').trim().toUpperCase() : '';
+      if (v && /[A-Z]/.test(v)) return prefixOf(v);
+      return null;
+    }
+    function qrOf(r, numRaw) {
+      var q = iQr !== -1 ? String(r[iQr] || '').trim() : '';
+      if (!q && iCid !== -1 && String(r[iCid] || '').trim()) {
+        var cid = parseInt(r[iCid], 10);
+        q = JSON.stringify({ container_id: isNaN(cid) ? String(r[iCid]).trim() : cid, facility_id: state.site, assignment: String(numRaw) });
       }
+      return q;
+    }
+
+    var haveRoutes = state.groups.length > 0;
+    var qrCount = 0;
+
+    if (!haveRoutes) {
+      // construir grupos a partir da base (só se ela tiver rota com letra)
+      var byGroup = {}, order = [];
+      parsed.rows.forEach(function (r) {
+        var num = sacaNumOf(r); if (num == null) return;
+        var route = routeOf(r); if (!route) return;
+        if (!byGroup[route]) { byGroup[route] = { name: route,
+          fullName: iOt !== -1 ? String(r[iOt] || '').trim().toUpperCase() : route,
+          planned: iPl !== -1 ? String(r[iPl] || '').trim().toUpperCase() : '', nums: [] }; order.push(route); }
+        byGroup[route].nums.push(num);
+        var q = qrOf(r, num); if (q) { state.qrByNum[num] = q; qrCount++; }
+        state.metaByNum[num] = { agencia: iAg !== -1 ? String(r[iAg] || '').trim() : '',
+          veiculo: iVe !== -1 ? limparVeiculo(r[iVe]) : '', rotasacapl: iCode !== -1 ? String(r[iCode] || '').trim() : '' };
+      });
+      if (order.length) {
+        state.source = 'extr';
+        state.groups = order.map(function (name) { var g = byGroup[name]; g.nums.sort(function (a, b) { return a - b; });
+          return { name: g.name, fullName: g.fullName, planned: g.planned, hybrid: true, count: g.nums.length, realSacas: g.nums }; });
+      }
+    } else {
+      // só preenche QR/meta nas sacas que já existem
+      parsed.rows.forEach(function (r) {
+        var num = sacaNumOf(r); if (num == null) return;
+        var q = qrOf(r, num); if (q) { state.qrByNum[num] = q; qrCount++; }
+        var ag = iAg !== -1 ? String(r[iAg] || '').trim() : '';
+        var ve = iVe !== -1 ? limparVeiculo(r[iVe]) : '';
+        var code = iCode !== -1 ? String(r[iCode] || '').trim() : '';
+        if (ag || ve || code) {
+          var prev = state.metaByNum[num] || {};
+          state.metaByNum[num] = { agencia: ag || prev.agencia || '', veiculo: ve || prev.veiculo || '', rotasacapl: code || prev.rotasacapl || '' };
+        }
+      });
+    }
+    return { qrCount: qrCount, rowCount: parsed.rows.length, headers: h };
+  }
+
+  async function tryFetchPublishedCsv() {
+    var url = state.qrBaseUrl || DEFAULT_QR_BASE_URL;
+    var attempt = { via: 'CSV publicado (fetch)', url: url, ok: false };
+    try {
+      var res = await fetch(url, { credentials: 'omit' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      var text = await res.text();
+      var rows = parseDelimited(text);
+      if (rows.length < 2) throw new Error('CSV vazio/sem linhas');
+      var parsed = { headers: rows[0].map(function (x) { return x.trim(); }),
+        rows: rows.slice(1).filter(function (r) { return r.some(function (v) { return v.trim() !== ''; }); }) };
+      attempt.ok = true; attempt.columns = parsed.headers; attempt.rowCount = parsed.rows.length;
+      attempt.sample = parsed.rows.slice(0, 2);
+      qrDiag.attempts.push(attempt);
+      return parsed;
+    } catch (err) {
+      attempt.error = (err && err.message) ? err.message : String(err);
+      qrDiag.attempts.push(attempt);
+      return null;
     }
   }
 
-  async function syncFromSheet(silent) {
+  async function tryGridSheets() {
     if (!ensureGridSheetsReady()) {
-      setSyncStatus(window.GridStore.isRunningInGrid() ? t('sync_no_api') : t('sync_not_grid'), silent ? null : 'err');
-      return false;
+      qrDiag.attempts.push({ via: 'Grid.sheets', ok: false, error: window.GridStore.isRunningInGrid() ? 'Grid.sheets indisponível' : 'fora do Grid' });
+      return null;
     }
-    setSyncStatus(t('sync_syncing'));
-    try {
-      var data = await fetchSheetData();
-      var parsed = normalizeSheetRows(data);
-      if (!parsed || !parsed.rows.length) {
-        setSyncStatus(t('sync_fail') + 'planilha vazia ou aba "' + GRID_SHEET_TAB + '" não encontrada.', 'err');
-        return false;
+    for (var i = 0; i < GRID_SHEET_TABS.length; i++) {
+      var tab = GRID_SHEET_TABS[i];
+      var attempt = { via: 'Grid.sheets', tab: tab, ok: false };
+      try {
+        var data;
+        try { data = await window.Grid.sheets.get(GRID_SHEET_ID, tab); }
+        catch (e1) { data = await window.Grid.sheets.get(GRID_SHEET_ID, tab + '!A:Z'); }
+        var parsed = normalizeSheetRows(data);
+        if (parsed && parsed.rows.length) {
+          attempt.ok = true; attempt.columns = parsed.headers; attempt.rowCount = parsed.rows.length; attempt.sample = parsed.rows.slice(0, 2);
+          qrDiag.attempts.push(attempt);
+          return parsed;
+        }
+        attempt.error = 'vazio'; qrDiag.attempts.push(attempt);
+      } catch (err) {
+        attempt.error = (err && err.message) ? err.message : String(err);
+        qrDiag.attempts.push(attempt);
       }
-      pending = { kind: 'extr', headers: parsed.headers, rows: parsed.rows, fileName: GRID_SHEET_TAB + ' (auto)' };
-      importExtracao();
-      state.lastSheetSync = new Date().toLocaleTimeString(state.lang === 'pt' ? 'pt-BR' : 'es-AR');
-      persist();
-      setSyncStatus(t('sync_ok') + state.lastSheetSync, 'ok');
-      return true;
-    } catch (err) {
-      console.warn('syncFromSheet falhou', err);
-      setSyncStatus(t('sync_fail') + (err && err.message ? err.message : String(err)), 'err');
+    }
+    return null;
+  }
+
+  async function loadQrBase(silent) {
+    qrDiag = { attempts: [], at: new Date().toLocaleString(state.lang === 'pt' ? 'pt-BR' : 'es-AR') };
+    setSyncStatus(t('sync_syncing'));
+    var parsed = await tryFetchPublishedCsv();
+    if (!parsed) parsed = await tryGridSheets();
+    if (!parsed) {
+      setSyncStatus(t('sync_fail_all'), silent ? null : 'err');
+      renderDiag();
       return false;
     }
+    var info = applyQrBase(parsed);
+    state.lastSheetSync = new Date().toLocaleTimeString(state.lang === 'pt' ? 'pt-BR' : 'es-AR');
+    persist(); render(); renderDiag();
+    if (info.qrCount === 0) { setSyncStatus(t('sync_no_qr_cols'), 'err'); return false; }
+    setSyncStatus(t('sync_ok') + state.lastSheetSync + ' · ' + info.qrCount + ' QR', 'ok');
+    return true;
   }
+  // alias antigo
+  function syncFromSheet(silent) { return loadQrBase(silent); }
 
   // ---------------------------------------------------------------- CSV
   function parseDelimited(text) {
@@ -311,6 +422,7 @@
     state.selection = []; state.excluded = [];
     pending = null; persist(); render();
     toast(groups.length + (state.lang === 'pt' ? ' rotas carregadas' : ' rutas cargadas'), true);
+    loadQrBase(true); // traz o QR automaticamente logo após a otimização
   }
 
   function assignRunningNumbers(groups) {
@@ -432,6 +544,7 @@
     var has = state.groups.length > 0;
     $('emptyState').style.display = has ? 'none' : 'flex';
     $('gridWrapper').style.display = has ? 'block' : 'none';
+    $('headerTools').style.display = has ? 'flex' : 'none';
     $('activeFile').style.display = state.optFileName ? 'inline-flex' : 'none';
     if (state.optFileName) $('activeFileName').textContent = state.optFileName;
     $('lastSave').textContent = state.lastSave ? (t('last_save') + state.lastSave) : '';
@@ -626,14 +739,37 @@
     persist(); $('cfgOverlay').classList.remove('open'); toast(t('saved_ok'), true);
   }
 
+  // ---------------------------------------------------------------- settings + diagnostics
+  function openSettings() {
+    $('setQrUrl').value = state.qrBaseUrl || DEFAULT_QR_BASE_URL;
+    renderDiag();
+    $('settingsOverlay').classList.add('open');
+  }
+  function renderDiag() {
+    var box = $('diagBox'); if (!box) return;
+    if (!qrDiag.attempts || !qrDiag.attempts.length) { box.innerHTML = '<span class="hint">' + t('no_diag') + '</span>'; return; }
+    box.innerHTML = (qrDiag.at ? '<div class="hint" style="margin-bottom:6px">' + esc(qrDiag.at) + '</div>' : '') +
+      qrDiag.attempts.map(function (a) {
+        var head = (a.ok ? '✅ ' : '❌ ') + esc(a.via) + (a.tab ? ' · ' + esc(a.tab) : '');
+        var body = a.ok
+          ? '<div class="hint">' + a.rowCount + ' linhas · colunas: ' + esc((a.columns || []).join(', ')) + '</div>' +
+            (a.sample ? '<pre class="diag-sample">' + esc(JSON.stringify(a.sample, null, 1)) + '</pre>' : '')
+          : '<div class="hint" style="color:var(--error)">' + esc(a.error || 'falhou') + (a.url ? ' · ' + esc(a.url) : '') + '</div>';
+        return '<div class="diag-item"><b>' + head + '</b>' + body + '</div>';
+      }).join('');
+  }
+  function saveSettings() {
+    var url = $('setQrUrl').value.trim();
+    state.qrBaseUrl = url || DEFAULT_QR_BASE_URL;
+    persist();
+    toast(t('saved_ok'), true);
+  }
+
   // ---------------------------------------------------------------- wiring
   document.addEventListener('DOMContentLoaded', function () {
-    ['btnAnexar', 'btnAnexar2'].forEach(function (id) { $(id).addEventListener('click', function () { chooseFile('opt'); }); });
-    $('btnExtracao').addEventListener('click', function () { chooseFile('extr'); });
-    ['btnSyncSheet', 'btnBannerExtr'].forEach(function (id) { $(id).addEventListener('click', function () { syncFromSheet(false); }); });
-    $('btnQrFallback').addEventListener('click', function () { chooseFile('qrfb'); });
-    ['btnRecuperar', 'btnRecuperar2'].forEach(function (id) { $(id).addEventListener('click', restoreSaved); });
-    $('btnLimparOtim').addEventListener('click', clearOptimization);
+    // Fluxo principal
+    ['btnAnexar2', 'btnTrocarOtim'].forEach(function (id) { $(id).addEventListener('click', function () { chooseFile('opt'); }); });
+    $('btnRecuperar2').addEventListener('click', restoreSaved);
 
     $('searchInput').addEventListener('input', renderRoutes);
     $('btnSelAll').addEventListener('click', selectAllVisible);
@@ -642,12 +778,10 @@
       state.excluded = []; persist(); render();
       toast(state.lang === 'pt' ? 'Sacas restauradas!' : '¡Sacas restauradas!', true);
     });
-    $('btnVerExtracao').addEventListener('click', openExtracao);
-    $('closeExtracao').addEventListener('click', function () { $('extracaoOverlay').classList.remove('open'); });
-    $('extracaoOverlay').addEventListener('click', function (e) { if (e.target === this) this.classList.remove('open'); });
-
     $('btnSalvar').addEventListener('click', saveChoice);
     $('btnPrint').addEventListener('click', printSelection);
+    $('btnBannerExtr').addEventListener('click', function () { loadQrBase(false); });
+
     $('formatSelect').addEventListener('change', function () {
       $('btnCfgEtq').style.display = this.value === 'etiqueta' ? 'inline-flex' : 'none';
     });
@@ -655,6 +789,19 @@
     $('closeCfg').addEventListener('click', function () { $('cfgOverlay').classList.remove('open'); });
     $('cancelCfg').addEventListener('click', function () { $('cfgOverlay').classList.remove('open'); });
     $('saveCfg').addEventListener('click', saveCfg);
+
+    // Configurações / avançado
+    $('btnSettings').addEventListener('click', openSettings);
+    $('closeSettings').addEventListener('click', function () { $('settingsOverlay').classList.remove('open'); });
+    $('cancelSettings').addEventListener('click', function () { $('settingsOverlay').classList.remove('open'); });
+    $('settingsOverlay').addEventListener('click', function (e) { if (e.target === this) this.classList.remove('open'); });
+    $('saveSettings').addEventListener('click', saveSettings);
+    $('btnTestConn').addEventListener('click', function () { saveSettings(); loadQrBase(false); });
+    $('btnExtracao').addEventListener('click', function () { chooseFile('extr'); });
+    $('btnQrFallback').addEventListener('click', function () { chooseFile('qrfb'); });
+    $('btnVerExtracao').addEventListener('click', openExtracao);
+    $('closeExtracao').addEventListener('click', function () { $('extracaoOverlay').classList.remove('open'); });
+    $('extracaoOverlay').addEventListener('click', function (e) { if (e.target === this) this.classList.remove('open'); });
 
     $('siteSelect').addEventListener('change', function () { state.site = this.value; persist(); });
     $('langSelect').addEventListener('change', function () { state.lang = this.value; persist(); applyLang(); render(); });

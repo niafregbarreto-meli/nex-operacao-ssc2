@@ -4,11 +4,39 @@ Réplica da ferramenta **GESTÃO NEX** (hoje em Apps Script, sendo
 descontinuada) migrada para **Grid**, num único arquivo HTML, redesenhada
 com visual **Andes / Mercado Livre**.
 
-O operador: escolhe o site → **anexa só o CSV de otimização** (o QR real
-chega solo, sincronizado direto da planilha via Grid) → vê cada rota (L1,
-L2, M1…) como uma grade de **botões de saca numerados**, seleciona quais
-imprimir (pode excluir sacas pontuais com o ×) → imprime cartões com número
-grande + prefixo da rota + QR real da saca.
+O operador **só sobe o CSV de otimização**. O QR real de cada saca chega
+sozinho de uma **base publicada** (CSV público, atualizado por query
+diária) — sem OAuth, sem passo manual. Depois vê cada rota (L1, L2, M1…)
+como uma grade de **botões de saca numerados**, exclui as sacas
+indisponíveis com o ×, escolhe o formato e imprime.
+
+Interface propositalmente enxuta: cabeçalho com Site, "Sacas disponíveis" e
+⚙; tudo que é técnico (URL da base de QR, CSV manual, + QR adicional, e um
+painel de **Diagnóstico** que mostra exatamente o que a base retornou) fica
+dentro do ⚙, fora do caminho do operador.
+
+## Como o QR chega (a parte que faltava)
+
+O QR **nunca é digitado nem subido à mão**. Duas vias automáticas, tentadas
+em ordem, primeira que funcionar ganha:
+
+1. **`fetch()` do CSV publicado** (`DEFAULT_QR_BASE_URL` no topo de `app.js`):
+   `.../pub?gid=1505849780&single=true&output=csv`. É um GET **público, sem
+   OAuth** — a via mais simples e a que a URL do usuário aponta. Pode ser
+   bloqueada pela CSP do iframe do Grid (não dá para saber sem testar lá).
+2. **`Grid.sheets.get()`** — SDK do Grid (precisa Google conectado, que o
+   usuário já tem). Tenta as abas `SEPARACAO_NEX`/`EXTRACAO`/`Extração`.
+
+O parsing é flexível: a chave da saca sai de `ROTASACA` (ou da coluna de
+rota, quando numérica); o QR sai de `CONTAINER_QR` (ou é reconstruído
+`{container_id, facility_id, assignment}` a partir de `CONTAINER_ID`);
+agência/modal entram se existirem. Se já há rotas (otimização subida), só
+preenche o QR por número; se não há e a base traz rota, monta os grupos a
+partir dela.
+
+**Diagnóstico (⚙ → Diagnóstico):** cada tentativa fica registrada com
+via/aba, ✅/❌, colunas detectadas e as 2 primeiras linhas. Se o QR não vier,
+esse painel diz exatamente o quê veio (ou o erro), em vez de falhar mudo.
 
 ## Estrutura
 
