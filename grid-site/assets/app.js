@@ -260,6 +260,19 @@
     return { qrCount: qrCount, rowCount: parsed.rows.length, headers: h };
   }
 
+  // Extrai uma mensagem legível de qualquer coisa que dê erro — Error de
+  // verdade, objeto de resposta da API do Grid, string, etc. String(err) em
+  // objeto simples vira "[object Object]", que não diz nada no Diagnóstico.
+  function describeError(err) {
+    if (!err) return 'erro desconhecido';
+    if (typeof err === 'string') return err;
+    if (err.message) return err.message;
+    if (err.error) return typeof err.error === 'string' ? err.error : describeError(err.error);
+    if (err.status || err.statusText) return 'HTTP ' + (err.status || '') + ' ' + (err.statusText || '');
+    try { var s = JSON.stringify(err); if (s && s !== '{}') return s; } catch (e) { /* ignore */ }
+    try { return String(err); } catch (e) { return 'erro desconhecido'; }
+  }
+
   async function tryFetchPublishedCsv() {
     var url = state.qrBaseUrl || DEFAULT_QR_BASE_URL;
     var attempt = { via: 'CSV publicado (fetch)', url: url, ok: false };
@@ -276,7 +289,7 @@
       qrDiag.attempts.push(attempt);
       return parsed;
     } catch (err) {
-      attempt.error = (err && err.message) ? err.message : String(err);
+      attempt.error = describeError(err);
       qrDiag.attempts.push(attempt);
       return null;
     }
@@ -312,7 +325,7 @@
         }
         attempt.error = 'vazio'; qrDiag.attempts.push(attempt);
       } catch (err) {
-        attempt.error = (err && err.message) ? err.message : String(err);
+        attempt.error = describeError(err);
         qrDiag.attempts.push(attempt);
       }
     }
