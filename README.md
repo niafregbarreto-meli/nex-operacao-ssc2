@@ -4,10 +4,11 @@ Réplica da ferramenta **GESTÃO NEX** (hoje em Apps Script, sendo
 descontinuada) migrada para **Grid**, num único arquivo HTML, redesenhada
 com visual **Andes / Mercado Livre**.
 
-O operador: escolhe o site → importa a otimização/extração → vê cada rota
-(L1, L2, M1…) como uma grade de **botões de saca numerados**, seleciona
-quais imprimir (pode excluir sacas pontuais com o ×) → imprime cartões com
-número grande + prefixo da rota + QR real da saca.
+O operador: escolhe o site → **anexa só o CSV de otimização** (o QR real
+chega solo, sincronizado direto da planilha via Grid) → vê cada rota (L1,
+L2, M1…) como uma grade de **botões de saca numerados**, seleciona quais
+imprimir (pode excluir sacas pontuais com o ×) → imprime cartões com número
+grande + prefixo da rota + QR real da saca.
 
 ## Estrutura
 
@@ -36,16 +37,23 @@ grep -c "localStorage\|sessionStorage\|cdn\.\|cdnjs\|tailwindcss" dist/nex-ssc2-
 
 ## Fluxo (fiel ao Apps Script original)
 
-1. **Otimização / Extração** — três formas de carregar as rotas e suas sacas:
-   - **Anexar CSV** (otimização): rota + quantidade de sacas. Numera as
-     sacas com um **contador global sequencial** por todo o site (L1 = 1–36,
-     L2 continua 37–41…), não reinicia por rota.
-   - **Extração (QR)**: o CSV da query BigQuery
-     (`ROTAOT, ROTAPL, ROTASACA, ROTASACAPL, CONTAINER_QR, AGENCIA, VEICULO`).
-     Só entram linhas cuja `ROTASACA` é **puramente numérica** (sacas NEX);
-     linhas de rota/CHP são ignoradas. Constrói as rotas **e** traz o
-     `CONTAINER_QR` real de cada saca — é o caminho que deixa os botões
-     "acesos" e prontos para imprimir.
+1. **Otimização (manual) + Extração (automática)**:
+   - **Anexar CSV** (otimização) — o **único upload manual**. Rota +
+     quantidade de sacas. Numera as sacas com um **contador global
+     sequencial** por todo o site (L1 = 1–36, L2 continua 37–41…), não
+     reinicia por rota.
+   - **Extração (QR) — automática**: ao abrir o app dentro do Grid, ele lê
+     sozinho a aba `SEPARACAO_NEX` da planilha "SSC2 BASE 2026"
+     (`Grid.sheets.get('1w31lqax56lMcjbvoj5VhdDf9gwEYSh2ldjMuTb9WV8Y',
+     'SEPARACAO_NEX')` — saída da query `Q_SEPARACAO`), sem nenhum passo do
+     operador. Um badge no cabeçalho mostra "Sincronizado às HH:MM" ou o
+     motivo da falha; o botão "Atualizar planilha" força um novo sync a
+     qualquer momento. Só entram linhas cuja `ROTASACA` é **puramente
+     numérica** (sacas NEX); linhas de rota/CHP são ignoradas. Constrói as
+     rotas **e** traz o `CONTAINER_QR` real de cada saca.
+   - **"CSV manual"** — fallback caso o Grid não consiga ler a planilha
+     (Google não conectado, `Grid.sheets` indisponível, etc.): mesmo CSV de
+     extração, só que subido à mão.
    - **Recuperar salvo**: recarrega o estado salvo no Grid.
 2. **Grade de sacas** — cada rota mostra seus números. Clicar seleciona
    (azul); o × exclui uma saca pontual (fica um buraco na numeração, igual à
@@ -108,16 +116,30 @@ compartilhados na conversa; a integração com a API do Grid e o
 `window.GRID.state` em produção precisam ser validados de um ambiente com
 VPN corporativa da MELI.
 
-## Próximo passo importante: auto-carga da base via Grid Sheets
+## Auto-sync da planilha via Grid.sheets — status
 
-Hoje a base de QR/agência/modal entra por **upload de CSV** (botão "Extração
-(QR)"). O usuário confirmou que o Grid lê planilhas do Google direto (só
-leitura) — isso corresponde ao SDK `Grid.sheets.get(sheetId, 'TAB')`. O
-plano é, rodando dentro do Grid, ler automaticamente a aba de extração da
-planilha "SSC2 BASE 2026" (`1w31lqax56lMcjbvoj5VhdDf9gwEYSh2ldjMuTb9WV8Y`,
-atualizada por queries diariamente), sem passo manual. Não foi implementado
-ainda porque não dá para testar `Grid.sheets` fora do Grid — precisa ser
-feito/validado num ambiente com Grid + VPN.
+Implementado (`syncFromSheet()` em `app.js`) e testado com Playwright
+**simulando** `window.GRID.sheets.get()` (não dá para chamar a API real do
+Grid deste sandbox — sem rede para `grid.melioffice.com`/VPN da MELI). O
+teste simulado confirma: chama `Grid.sheets.get('1w31...WV8Y',
+'SEPARACAO_NEX')`, aceita tanto array-de-arrays (header na 1ª linha) quanto
+array-de-objetos, popula rotas + QR automaticamente sem upload manual, e
+trata 3 cenários de erro com mensagem clara: fora do Grid, Grid sem API de
+sheets, e falha na chamada (ex. Google não conectado).
+
+**Falta validar num Grid real:**
+- Se `Grid.sheets.get(sheetId, tab)` é de fato a assinatura certa (a doc da
+  skill descreve `GET /api/v1/sheets/{google_sheet_id}?doc_id=...&range=TAB`
+  via esse wrapper, mas não tenho como confirmar o shape exato da resposta).
+- Se o dono deste documento Grid precisa conectar o Google primeiro
+  (`/google/oauth/start`) para a chamada funcionar.
+- Se o ID da planilha/aba (`1w31lqax56lMcjbvoj5VhdDf9gwEYSh2ldjMuTb9WV8Y` /
+  `SEPARACAO_NEX`) é exatamente isso ou precisa ajuste — está no topo de
+  `app.js` (`GRID_SHEET_ID`, `GRID_SHEET_TAB`) para editar fácil se mudar.
+
+Se ao testar no Grid real aparecer "QR PENDENTE" mesmo com o badge dizendo
+"Sincronizado às HH:MM", me manda esse horário + quantas rotas/sacas
+carregou, que eu ajusto o parsing.
 
 ## Ainda por confirmar
 

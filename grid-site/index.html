@@ -30,9 +30,13 @@
   <div class="header-tools" id="headerTools">
     <span class="group-label" data-i18n="optimization">Otimização</span>
     <button class="tool-link" id="btnAnexar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15.17 7l-6.58 6.59a2 2 0 102.82 2.82l6.42-6.58a4 4 0 00-5.66-5.66l-6.41 6.59a6 6 0 108.48 8.48L20.5 13"/></svg><span data-i18n="attach_csv">Anexar CSV</span></button>
-    <button class="tool-link" id="btnExtracao"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7v10c0 2.2 3.58 4 8 4s8-1.8 8-4V7M4 7c0 2.2 3.58 4 8 4s8-1.8 8-4M4 7c0-2.2 3.58-4 8-4s8 1.8 8 4"/></svg><span data-i18n="load_extr">Extração (QR)</span></button>
-    <button class="tool-link" id="btnQrFallback" title="Completar QR de sacas que já existem, sem tocar rotas"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v16m8-8H4"/></svg><span data-i18n="load_qr_extra">+ QR adicional</span></button>
     <button class="tool-link" id="btnRecuperar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h5M4 9a8 8 0 113 6"/></svg><span data-i18n="load_saved">Recuperar salvo</span></button>
+
+    <span class="group-label" style="margin-left:8px" data-i18n="extraction">Extração (QR)</span>
+    <button class="tool-link purple" id="btnSyncSheet"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.58M4.06 13a8 8 0 0015.4 2M20 20v-5h-.58M19.94 11a8 8 0 00-15.4-2"/></svg><span data-i18n="sync_now">Atualizar planilha</span></button>
+    <span id="syncStatus" class="hint" style="font-size:11px"></span>
+    <button class="tool-link" id="btnExtracao" title="Alternativa manual: subir o CSV da extração à mão" data-i18n="manual_csv">CSV manual</button>
+    <button class="tool-link" id="btnQrFallback" title="Completar QR de sacas que já existem, sem tocar rotas"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v16m8-8H4"/></svg><span data-i18n="load_qr_extra">+ QR adicional</span></button>
 
     <span id="activeFile" class="active-file" style="display:none">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 21h10a2 2 0 002-2V9.41a1 1 0 00-.29-.7l-5.41-5.42A1 1 0 0012.59 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
@@ -53,9 +57,8 @@
     <div class="actions">
       <button class="btn loud" id="btnAnexar2" data-i18n="attach_csv">Anexar CSV</button>
       <button class="btn quiet" id="btnRecuperar2" data-i18n="load_saved">Recuperar salvo</button>
-      <button class="btn purple" id="btnExtracao2" data-i18n="load_extr">Extração (QR)</button>
     </div>
-    <p data-i18n="opt_desc">A otimização define quais sacas pertencem a cada rota. A extração traz o QR real de cada saca para impressão.</p>
+    <p data-i18n="opt_desc">A otimização define quais sacas pertencem a cada rota. O QR real chega automaticamente da planilha de extração — não precisa subir nada para isso.</p>
   </section>
 
   <!-- Main grid -->
@@ -63,7 +66,7 @@
     <div id="baseBanner" class="banner" style="display:none">
       <span id="baseBannerMsg"></span>
       <span class="spacer"></span>
-      <button class="btn quiet sm" id="btnBannerExtr" data-i18n="load_extr">Extração (QR)</button>
+      <button class="btn quiet sm" id="btnBannerExtr" data-i18n="sync_now">Atualizar planilha</button>
     </div>
     <div class="toolbar">
       <div class="search">

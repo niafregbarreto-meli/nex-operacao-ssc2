@@ -3,6 +3,13 @@
 
   var SCHEMA_VERSION = 5;
 
+  // Planilha "SSC2 BASE 2026" — aba SEPARACAO_NEX (saída da query Q_SEPARACAO).
+  // Lida em tempo real via Grid.sheets.get() quando o app corre dentro do Grid
+  // e o dono do documento tem o Google conectado (Sheets). Editável aqui se a
+  // planilha ou a aba mudar de nome/ID no futuro.
+  var GRID_SHEET_ID = '1w31lqax56lMcjbvoj5VhdDf9gwEYSh2ldjMuTb9WV8Y';
+  var GRID_SHEET_TAB = 'SEPARACAO_NEX';
+
   function defaultState() {
     return {
       schemaVersion: SCHEMA_VERSION,
@@ -12,6 +19,7 @@
       source: null,            // 'opt' | 'extr'
       optFileName: null,
       lastSave: null,
+      lastSheetSync: null,
       groups: [],              // { name, fullName, planned, hybrid, count, realSacas:[num] }
       excluded: [],
       selection: [],
@@ -39,9 +47,14 @@
       no_saved: 'Nenhuma configuração salva encontrada.', hyb: 'HÍBRIDA',
       etq_cfg: 'Configurar etiqueta', width_cm: 'Largura (cm)', height_cm: 'Altura (cm)',
       pad_cm: 'Margem (cm)', etq_hint: 'O QR ocupa a lateral e o texto se ajusta à altura.', save: 'Salvar',
-      base_missing: 'Sem QR na base — importe a extração para imprimir os códigos.',
-      base_partial: 'sacas ainda sem QR. Importe/atualize a extração.',
-      base_ok: 'Base de QR carregada.'
+      base_missing: 'Sem QR na base — clique em "Atualizar planilha" ou verifique a conexão com o Google no Grid.',
+      base_partial: 'sacas ainda sem QR na planilha.',
+      base_ok: 'Base de QR sincronizada da planilha.',
+      extraction: 'Extração (QR)', sync_now: 'Atualizar planilha', manual_csv: 'CSV manual',
+      sync_syncing: 'Sincronizando planilha…', sync_ok: 'Sincronizado às ',
+      sync_not_grid: 'Fora do Grid — sem acesso à planilha. Use "CSV manual".',
+      sync_no_api: 'Este Grid ainda não tem Grid.sheets — conecte o Google (Grid → conectar Google) ou use "CSV manual".',
+      sync_fail: 'Falha ao ler a planilha — verifique se o Google está conectado no Grid. Detalhe: '
     },
     es: {
       site: 'Sitio', avail_bags: 'Sacas disponibles ↗', optimization: 'Optimización',
@@ -56,9 +69,14 @@
       no_saved: 'Ninguna configuración guardada encontrada.', hyb: 'HÍBRIDA',
       etq_cfg: 'Configurar etiqueta', width_cm: 'Ancho (cm)', height_cm: 'Alto (cm)',
       pad_cm: 'Margen (cm)', etq_hint: 'El QR ocupa el lateral y el texto se ajusta al alto.', save: 'Guardar',
-      base_missing: 'Sin QR en la base — importá la extração para imprimir los códigos.',
-      base_partial: 'sacas todavía sin QR. Importá/actualizá la extração.',
-      base_ok: 'Base de QR cargada.'
+      base_missing: 'Sin QR en la base — hacé clic en "Actualizar planilla" o revisá la conexión con Google en Grid.',
+      base_partial: 'sacas todavía sin QR en la planilla.',
+      base_ok: 'Base de QR sincronizada de la planilla.',
+      extraction: 'Extração (QR)', sync_now: 'Actualizar planilla', manual_csv: 'CSV manual',
+      sync_syncing: 'Sincronizando planilla…', sync_ok: 'Sincronizado a las ',
+      sync_not_grid: 'Fuera de Grid — sin acceso a la planilla. Usá "CSV manual".',
+      sync_no_api: 'Este Grid todavía no tiene Grid.sheets — conectá Google (Grid → conectar Google) o usá "CSV manual".',
+      sync_fail: 'Falló la lectura de la planilla — revisá si Google está conectado en Grid. Detalle: '
     }
   };
   function t(k) { return (I18N[state.lang] && I18N[state.lang][k]) || I18N.pt[k] || k; }
@@ -113,6 +131,59 @@
     $('siteSelect').value = state.site;
     applyLang();
     render();
+    syncFromSheet(true); // silencioso: não pisa a tela com erro num primeiro load
+  }
+
+  // ---------------------------------------------------------------- Google Sheet auto-sync
+  function setSyncStatus(msg, kind) {
+    var el = $('syncStatus'); if (!el) return;
+    el.textContent = msg || '';
+    el.style.color = kind === 'err' ? 'var(--error)' : kind === 'ok' ? 'var(--success)' : 'var(--text-2)';
+  }
+
+  // Converte o retorno de Grid.sheets.get() (formato pode variar: array de
+  // arrays com header na 1ª linha, ou array de objetos) para {headers, rows}.
+  function normalizeSheetRows(data) {
+    if (!data) return null;
+    if (Array.isArray(data) && data.length && Array.isArray(data[0])) {
+      var headers = data[0].map(function (h) { return String(h == null ? '' : h).trim(); });
+      var rows = data.slice(1)
+        .filter(function (r) { return r.some(function (v) { return String(v == null ? '' : v).trim() !== ''; }); })
+        .map(function (r) { return r.map(function (v) { return v == null ? '' : String(v); }); });
+      return { headers: headers, rows: rows };
+    }
+    if (Array.isArray(data) && data.length && data[0] && typeof data[0] === 'object') {
+      var headers2 = Object.keys(data[0]);
+      var rows2 = data.map(function (obj) { return headers2.map(function (h) { return obj[h] == null ? '' : String(obj[h]); }); });
+      return { headers: headers2, rows: rows2 };
+    }
+    return null;
+  }
+
+  async function syncFromSheet(silent) {
+    if (!(window.GRID && window.GRID.sheets && typeof window.GRID.sheets.get === 'function')) {
+      setSyncStatus(window.GridStore.isRunningInGrid() ? t('sync_no_api') : t('sync_not_grid'), silent ? null : 'err');
+      return false;
+    }
+    setSyncStatus(t('sync_syncing'));
+    try {
+      var data = await window.GRID.sheets.get(GRID_SHEET_ID, GRID_SHEET_TAB);
+      var parsed = normalizeSheetRows(data);
+      if (!parsed || !parsed.rows.length) {
+        setSyncStatus(t('sync_fail') + 'planilha vazia ou aba "' + GRID_SHEET_TAB + '" não encontrada.', 'err');
+        return false;
+      }
+      pending = { kind: 'extr', headers: parsed.headers, rows: parsed.rows, fileName: GRID_SHEET_TAB + ' (auto)' };
+      importExtracao();
+      state.lastSheetSync = new Date().toLocaleTimeString(state.lang === 'pt' ? 'pt-BR' : 'es-AR');
+      persist();
+      setSyncStatus(t('sync_ok') + state.lastSheetSync, 'ok');
+      return true;
+    } catch (err) {
+      console.warn('syncFromSheet falhou', err);
+      setSyncStatus(t('sync_fail') + (err && err.message ? err.message : String(err)), 'err');
+      return false;
+    }
   }
 
   // ---------------------------------------------------------------- CSV
@@ -501,7 +572,8 @@
   // ---------------------------------------------------------------- wiring
   document.addEventListener('DOMContentLoaded', function () {
     ['btnAnexar', 'btnAnexar2'].forEach(function (id) { $(id).addEventListener('click', function () { chooseFile('opt'); }); });
-    ['btnExtracao', 'btnExtracao2', 'btnBannerExtr'].forEach(function (id) { $(id).addEventListener('click', function () { chooseFile('extr'); }); });
+    $('btnExtracao').addEventListener('click', function () { chooseFile('extr'); });
+    ['btnSyncSheet', 'btnBannerExtr'].forEach(function (id) { $(id).addEventListener('click', function () { syncFromSheet(false); }); });
     $('btnQrFallback').addEventListener('click', function () { chooseFile('qrfb'); });
     ['btnRecuperar', 'btnRecuperar2'].forEach(function (id) { $(id).addEventListener('click', restoreSaved); });
     $('btnLimparOtim').addEventListener('click', clearOptimization);
