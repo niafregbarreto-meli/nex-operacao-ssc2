@@ -469,7 +469,10 @@
   function assignRunningNumbers(groups) {
     var skip = excludedSet(), n = 1;
     RESERVED_NUMS.forEach(function (r) { skip.add(r); });
-    Object.keys(state.renum || {}).forEach(function (k) { skip.add(parseInt(state.renum[k], 10)); });
+    // Não reserva o número de destino de uma renumeração globalmente: duas
+    // rotas podem mostrar o mesmo número temporariamente durante a edição
+    // (pedido explícito) — só não pode repetir DENTRO da mesma rota, e isso
+    // já é validado no momento de salvar a renumeração.
     groups.forEach(function (g) {
       var arr = [], got = 0, idx = 0;
       while (got < g.count) {
@@ -672,6 +675,13 @@
         state.selection = Array.from(s); persist(); renderRoutes(); updatePrintBar();
       });
       btn.addEventListener('dblclick', function (e) {
+        // só abre se o duplo clique foi no número em si — nunca no × (excluir)
+        // nem no pontinho de status, senão excluir vira renumerar por engano.
+        if (e.target.classList.contains('rm') || e.target.classList.contains('dot')) return;
+        // excluir uma saca redesenha a grade na hora; se o operador está
+        // excluindo várias rápido, o próximo clique pode cair (por reflow)
+        // onde estava o × anterior e o navegador lê como duplo clique.
+        if (Date.now() - lastExcludeAt < 500) return;
         e.preventDefault(); e.stopPropagation();
         openRenum(groupName, idx, num);
       });
@@ -679,6 +689,7 @@
     wrap.querySelectorAll('.rm').forEach(function (x) {
       x.addEventListener('click', function (e) {
         e.stopPropagation();
+        lastExcludeAt = Date.now();
         var num = parseInt(x.getAttribute('data-rm'), 10);
         var ex = excludedSet(); ex.add(num); state.excluded = Array.from(ex);
         var s = selectionSet(); s.delete(num); state.selection = Array.from(s);
@@ -789,9 +800,9 @@
         }
         html += '<div class="folha-page">' + half('oeste') + half('leste') + '</div>';
       });
-    } else { // etiqueta
+    } else { // etiqueta — SACA / ROTA / AGÊNCIA (sem MODAL)
       var c = state.cfgEtq, inner = (c.h - c.p * 2);
-      var fs = (inner / 4 * 0.82).toFixed(2) + 'cm';
+      var fs = (inner / 3 * 0.82).toFixed(2) + 'cm';
       dynStyle('@media print{@page{size:' + c.w + 'cm ' + c.h + 'cm;margin:0}' +
         '.etq{width:' + c.w + 'cm;height:' + c.h + 'cm;padding:' + c.p + 'cm;--etq-fs:' + fs + '}' +
         '.etq .qr{width:' + inner + 'cm;height:' + inner + 'cm}}');
@@ -800,7 +811,6 @@
           '<div class="ln"><span class="k">SACA:</span>' + esc(it.num) + '</div>' +
           '<div class="ln"><span class="k">ROTA:</span>' + esc(it.route) + '</div>' +
           '<div class="ln"><span class="k">AGÊNCIA:</span>' + esc(it.chp ? '' : (it.agencia || '—')) + '</div>' +
-          '<div class="ln"><span class="k">MODAL:</span>' + esc(it.chp ? '' : (it.modal || '—')) + '</div>' +
           '</div></div>';
       });
     }
@@ -824,6 +834,7 @@
   // assignRunningNumbers recalcula os números do zero em todo render (fonte
   // = otimização) — só mudar o array direto seria apagado no próximo render.
   var renumTarget = null; // { groupName, idx, oldNum }
+  var lastExcludeAt = 0; // guarda contra dblclick fantasma logo depois de excluir uma saca
   function openRenum(groupName, idx, oldNum) {
     renumTarget = { groupName: groupName, idx: idx, oldNum: oldNum };
     $('renumInput').value = oldNum;
@@ -836,12 +847,13 @@
     if (isNaN(newNum) || newNum <= 0) { toast(t('renum_invalid'), false); return; }
     if (newNum === renumTarget.oldNum) { $('renumOverlay').classList.remove('open'); return; }
     if (RESERVED_NUMS.indexOf(newNum) !== -1) { toast(t('renum_reserved'), false); return; }
-    var taken = false;
-    state.groups.forEach(function (g) { if ((g.realSacas || []).indexOf(newNum) !== -1) taken = true; });
-    if (taken) { toast(t('renum_taken'), false); return; }
 
     var g = state.groups.filter(function (x) { return x.name === renumTarget.groupName; })[0];
     if (!g) return;
+    // Só rejeita se o número já existir DENTRO da mesma rota — durante a
+    // edição é normal duas rotas terem temporariamente o mesmo número.
+    var taken = (g.realSacas || []).indexOf(newNum) !== -1;
+    if (taken) { toast(t('renum_taken'), false); return; }
     var idx = g.realSacas.indexOf(renumTarget.oldNum);
     if (idx === -1) return;
     g.realSacas[idx] = newNum;
