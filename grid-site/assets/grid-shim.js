@@ -5,11 +5,17 @@
  * Grid) falls back to a plain in-memory variable instead — it won't survive
  * a reload, but it keeps the app usable for local testing without risking
  * an upload rejection.
+ *
+ * window.GRID.state.get() resolves to {state, updated_at} (not the bare
+ * state) and .set(next, updated_at) takes the previous updated_at back as an
+ * optimistic-lock token — both are easy to miss and silently break
+ * persistence, so this shim tracks updated_at internally.
  */
 (function (global) {
   var saveTimer = null;
   var pendingState = null;
   var memoryFallback = null;
+  var lastUpdatedAt = null;
 
   function hasGridState() {
     return !!(global.GRID && global.GRID.state && typeof global.GRID.state.get === 'function');
@@ -19,7 +25,9 @@
     async load() {
       if (hasGridState()) {
         try {
-          var state = await global.GRID.state.get();
+          var res = await global.GRID.state.get();
+          lastUpdatedAt = res && res.updated_at != null ? res.updated_at : null;
+          var state = res && res.state;
           return state && Object.keys(state).length ? state : null;
         } catch (err) {
           console.warn('GRID.state.get failed, starting empty', err);
@@ -42,7 +50,8 @@
     async saveNow(state) {
       if (hasGridState()) {
         try {
-          await global.GRID.state.set(state);
+          var res = await global.GRID.state.set(state, lastUpdatedAt);
+          if (res && res.updated_at != null) lastUpdatedAt = res.updated_at;
         } catch (err) {
           console.error('GRID.state.set failed', err);
         }

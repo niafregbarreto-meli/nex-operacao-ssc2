@@ -118,28 +118,49 @@ VPN corporativa da MELI.
 
 ## Auto-sync da planilha via Grid.sheets — status
 
-Implementado (`syncFromSheet()` em `app.js`) e testado com Playwright
-**simulando** `window.GRID.sheets.get()` (não dá para chamar a API real do
-Grid deste sandbox — sem rede para `grid.melioffice.com`/VPN da MELI). O
-teste simulado confirma: chama `Grid.sheets.get('1w31...WV8Y',
-'SEPARACAO_NEX')`, aceita tanto array-de-arrays (header na 1ª linha) quanto
-array-de-objetos, popula rotas + QR automaticamente sem upload manual, e
-trata 3 cenários de erro com mensagem clara: fora do Grid, Grid sem API de
-sheets, e falha na chamada (ex. Google não conectado).
+**Bug real encontrado e corrigido** (era a causa provável do "QR PENDENTE"
+mesmo com Google já conectado): a API de Sheets vive em `window.Grid`
+(mixed-case, carregado via `<script src="/d/_assets/grid-sdk.js">` +
+`Grid.configure({docId})`) — **não** em `window.GRID` (all-caps, injetado
+automaticamente, só tem `.state`/`.states`). O código anterior checava
+`window.GRID.sheets`, que nunca existe; por isso a sincronização nunca
+chegava a tentar a chamada real, silenciosamente.
 
-**Falta validar num Grid real:**
-- Se `Grid.sheets.get(sheetId, tab)` é de fato a assinatura certa (a doc da
-  skill descreve `GET /api/v1/sheets/{google_sheet_id}?doc_id=...&range=TAB`
-  via esse wrapper, mas não tenho como confirmar o shape exato da resposta).
-- Se o dono deste documento Grid precisa conectar o Google primeiro
-  (`/google/oauth/start`) para a chamada funcionar.
-- Se o ID da planilha/aba (`1w31lqax56lMcjbvoj5VhdDf9gwEYSh2ldjMuTb9WV8Y` /
-  `SEPARACAO_NEX`) é exatamente isso ou precisa ajuste — está no topo de
-  `app.js` (`GRID_SHEET_ID`, `GRID_SHEET_TAB`) para editar fácil se mudar.
+Corrigido em `app.js`:
+- `<script src="/d/_assets/grid-sdk.js">` adicionado no `index.html`.
+- `Grid.configure({docId})` chamado uma vez, com o `docId` obtido de
+  `window.GRID.docId` (com fallback ao path `/d/<id>/raw`) — não precisa
+  hardcodear o ID do documento.
+- `syncFromSheet()` agora checa `window.Grid.sheets` (certo) e trata os 4
+  formatos de resposta documentados: array puro, `{values:[...]}`,
+  `{rows:[...]}` e `{sheets:{TAB:[...]}}`.
+- `grid-shim.js`: `window.GRID.state.get()` resolve `{state, updated_at}`,
+  não o state puro — o código antigo devolvia o objeto errado (isso quebraria
+  a leitura do estado salvo silenciosamente). Corrigido para desempacotar e
+  guardar `updated_at` para o próximo `.set(next, updated_at)`.
+- **Regressão evitada:** como a sincronização agora corre em **todo** load
+  (silenciosa), `importExtracao()` deixou de resetar a seleção de impressão
+  e as sacas excluídas a cada vez — só `importOptimization()` (nova
+  numeração) reseta os dois.
 
-Se ao testar no Grid real aparecer "QR PENDENTE" mesmo com o badge dizendo
-"Sincronizado às HH:MM", me manda esse horário + quantas rotas/sacas
-carregou, que eu ajusto o parsing.
+Testado com Playwright simulando `window.GRID` (docId + state) e
+`window.Grid` (configure + sheets.get) como dois objetos separados — não dá
+para chamar a API real deste sandbox (sem rede para
+`grid.melioffice.com`/VPN da MELI). Confirmado: `Grid.configure` chamado uma
+vez só, `Grid.sheets.get(sheetId, tab)` com os args certos, os 4 formatos de
+resposta populam igual, seleção/exclusão sobrevivem a um re-sync manual, e
+o estado sobrevive a um reload.
+
+**Ainda por confirmar num Grid real:**
+- Se `Grid.sheets.get(sheetId, tab)` aceita o nome do tab puro (`'SEPARACAO_NEX'`)
+  como no exemplo da doc, ou exige A1 notation (`'SEPARACAO_NEX!A:Z'`).
+- Se o ID da planilha (`1w31lqax56lMcjbvoj5VhdDf9gwEYSh2ldjMuTb9WV8Y`) e a
+  aba (`SEPARACAO_NEX`) são exatamente isso — está no topo de `app.js`
+  (`GRID_SHEET_ID`, `GRID_SHEET_TAB`) para editar fácil se mudar.
+
+Se ainda aparecer "QR PENDENTE" depois desta correção, me manda o texto
+exato do `#syncStatus` (ao lado do botão "Atualizar planilha") — agora ele
+deveria dizer a causa específica em vez de falhar em silêncio.
 
 ## Ainda por confirmar
 

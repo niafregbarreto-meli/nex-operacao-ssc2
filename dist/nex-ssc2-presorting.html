@@ -541,6 +541,8 @@ table.data tbody tr:hover { background: var(--andes-blue-bg); }
 </div>
 
 <div id="print-area"></div>
+
+<script src="/d/_assets/grid-sdk.js"></script>
 <script>
 //---------------------------------------------------------------------
 //
@@ -2848,11 +2850,17 @@ var qrcode = function() {
  * Grid) falls back to a plain in-memory variable instead — it won't survive
  * a reload, but it keeps the app usable for local testing without risking
  * an upload rejection.
+ *
+ * window.GRID.state.get() resolves to {state, updated_at} (not the bare
+ * state) and .set(next, updated_at) takes the previous updated_at back as an
+ * optimistic-lock token — both are easy to miss and silently break
+ * persistence, so this shim tracks updated_at internally.
  */
 (function (global) {
   var saveTimer = null;
   var pendingState = null;
   var memoryFallback = null;
+  var lastUpdatedAt = null;
 
   function hasGridState() {
     return !!(global.GRID && global.GRID.state && typeof global.GRID.state.get === 'function');
@@ -2862,7 +2870,9 @@ var qrcode = function() {
     async load() {
       if (hasGridState()) {
         try {
-          var state = await global.GRID.state.get();
+          var res = await global.GRID.state.get();
+          lastUpdatedAt = res && res.updated_at != null ? res.updated_at : null;
+          var state = res && res.state;
           return state && Object.keys(state).length ? state : null;
         } catch (err) {
           console.warn('GRID.state.get failed, starting empty', err);
@@ -2885,7 +2895,8 @@ var qrcode = function() {
     async saveNow(state) {
       if (hasGridState()) {
         try {
-          await global.GRID.state.set(state);
+          var res = await global.GRID.state.set(state, lastUpdatedAt);
+          if (res && res.updated_at != null) lastUpdatedAt = res.updated_at;
         } catch (err) {
           console.error('GRID.state.set failed', err);
         }
@@ -2969,7 +2980,7 @@ var qrcode = function() {
       pad_cm: 'Margem (cm)', etq_hint: 'O QR ocupa a lateral e o texto se ajusta à altura.', save: 'Salvar',
       base_missing: 'Sem QR na base — clique em "Atualizar planilha" ou verifique a conexão com o Google no Grid.',
       base_partial: 'sacas ainda sem QR na planilha.',
-      base_ok: 'Base de QR sincronizada da planilha.',
+      base_ok: 'Todas as sacas têm QR real.',
       extraction: 'Extração (QR)', sync_now: 'Atualizar planilha', manual_csv: 'CSV manual',
       sync_syncing: 'Sincronizando planilha…', sync_ok: 'Sincronizado às ',
       sync_not_grid: 'Fora do Grid — sem acesso à planilha. Use "CSV manual".',
@@ -2991,7 +3002,7 @@ var qrcode = function() {
       pad_cm: 'Margen (cm)', etq_hint: 'El QR ocupa el lateral y el texto se ajusta al alto.', save: 'Guardar',
       base_missing: 'Sin QR en la base — hacé clic en "Actualizar planilla" o revisá la conexión con Google en Grid.',
       base_partial: 'sacas todavía sin QR en la planilla.',
-      base_ok: 'Base de QR sincronizada de la planilla.',
+      base_ok: 'Todas las sacas tienen QR real.',
       extraction: 'Extração (QR)', sync_now: 'Actualizar planilla', manual_csv: 'CSV manual',
       sync_syncing: 'Sincronizando planilla…', sync_ok: 'Sincronizado a las ',
       sync_not_grid: 'Fuera de Grid — sin acceso a la planilla. Usá "CSV manual".',
@@ -3055,39 +3066,76 @@ var qrcode = function() {
   }
 
   // ---------------------------------------------------------------- Google Sheet auto-sync
+  //
+  // IMPORTANT: the Sheets API lives on `window.Grid` (mixed case, loaded via
+  // /d/_assets/grid-sdk.js + Grid.configure({docId})) — NOT on the auto-injected
+  // `window.GRID` (all caps), which only carries .state/.states. Mixing these
+  // up silently disables the sync (looks like "not available" instead of an
+  // actual error), so the check below is deliberately on `window.Grid`.
+  var gridConfigured = false;
+
+  function getGridDocId() {
+    try {
+      if (window.GRID && window.GRID.docId) return window.GRID.docId;
+      var m = /\/d\/([^/]+)\/raw/.exec(document.location.pathname);
+      if (m) return m[1];
+    } catch (e) { /* ignore */ }
+    return null;
+  }
+
+  function ensureGridSheetsReady() {
+    if (gridConfigured) return true;
+    if (!(window.Grid && typeof window.Grid.configure === 'function' && window.Grid.sheets)) return false;
+    var docId = getGridDocId();
+    if (!docId) return false;
+    window.Grid.configure({ docId: docId });
+    gridConfigured = true;
+    return true;
+  }
+
   function setSyncStatus(msg, kind) {
     var el = $('syncStatus'); if (!el) return;
     el.textContent = msg || '';
     el.style.color = kind === 'err' ? 'var(--error)' : kind === 'ok' ? 'var(--success)' : 'var(--text-2)';
   }
 
-  // Converte o retorno de Grid.sheets.get() (formato pode variar: array de
-  // arrays com header na 1ª linha, ou array de objetos) para {headers, rows}.
+  // Grid.sheets.get() shape varies by version — cobre os 4 formatos documentados.
+  function extractRows(result) {
+    if (Array.isArray(result)) return result;
+    if (result && Array.isArray(result.values)) return result.values;
+    if (result && Array.isArray(result.rows)) return result.rows;
+    if (result && result.sheets && Array.isArray(result.sheets[GRID_SHEET_TAB])) return result.sheets[GRID_SHEET_TAB];
+    return null;
+  }
+
+  // Converte as linhas (array de arrays com header na 1ª linha, ou array de
+  // objetos) para {headers, rows}.
   function normalizeSheetRows(data) {
-    if (!data) return null;
-    if (Array.isArray(data) && data.length && Array.isArray(data[0])) {
-      var headers = data[0].map(function (h) { return String(h == null ? '' : h).trim(); });
-      var rows = data.slice(1)
+    var rows = extractRows(data);
+    if (!rows || !rows.length) return null;
+    if (Array.isArray(rows[0])) {
+      var headers = rows[0].map(function (h) { return String(h == null ? '' : h).trim(); });
+      var dataRows = rows.slice(1)
         .filter(function (r) { return r.some(function (v) { return String(v == null ? '' : v).trim() !== ''; }); })
         .map(function (r) { return r.map(function (v) { return v == null ? '' : String(v); }); });
-      return { headers: headers, rows: rows };
+      return { headers: headers, rows: dataRows };
     }
-    if (Array.isArray(data) && data.length && data[0] && typeof data[0] === 'object') {
-      var headers2 = Object.keys(data[0]);
-      var rows2 = data.map(function (obj) { return headers2.map(function (h) { return obj[h] == null ? '' : String(obj[h]); }); });
+    if (rows[0] && typeof rows[0] === 'object') {
+      var headers2 = Object.keys(rows[0]);
+      var rows2 = rows.map(function (obj) { return headers2.map(function (h) { return obj[h] == null ? '' : String(obj[h]); }); });
       return { headers: headers2, rows: rows2 };
     }
     return null;
   }
 
   async function syncFromSheet(silent) {
-    if (!(window.GRID && window.GRID.sheets && typeof window.GRID.sheets.get === 'function')) {
+    if (!ensureGridSheetsReady()) {
       setSyncStatus(window.GridStore.isRunningInGrid() ? t('sync_no_api') : t('sync_not_grid'), silent ? null : 'err');
       return false;
     }
     setSyncStatus(t('sync_syncing'));
     try {
-      var data = await window.GRID.sheets.get(GRID_SHEET_ID, GRID_SHEET_TAB);
+      var data = await window.Grid.sheets.get(GRID_SHEET_ID, GRID_SHEET_TAB);
       var parsed = normalizeSheetRows(data);
       if (!parsed || !parsed.rows.length) {
         setSyncStatus(t('sync_fail') + 'planilha vazia ou aba "' + GRID_SHEET_TAB + '" não encontrada.', 'err');
@@ -3174,7 +3222,10 @@ var qrcode = function() {
     if (!groups.length) { toast('Nenhuma rota híbrida (NEX) encontrada no arquivo.', false); return; }
 
     assignRunningNumbers(groups);
-    state.source = 'opt'; state.groups = groups; state.optFileName = pending.fileName; state.selection = [];
+    // Nova otimização = numeração global do zero: exclusões/seleção da rodada
+    // anterior não têm mais sentido (o mesmo número agora é outra saca).
+    state.source = 'opt'; state.groups = groups; state.optFileName = pending.fileName;
+    state.selection = []; state.excluded = [];
     pending = null; persist(); render();
     toast(groups.length + (state.lang === 'pt' ? ' rotas carregadas' : ' rutas cargadas'), true);
   }
@@ -3228,8 +3279,11 @@ var qrcode = function() {
       return { name: g.name, fullName: g.fullName, planned: g.planned, hybrid: true, count: g.nums.length, realSacas: g.nums };
     });
 
+    // Não reseta selection/excluded: isto agora corre automaticamente em todo
+    // load (auto-sync da planilha), e o número da saca não muda — só chegam
+    // dados reais (QR/agência/modal) para o que já existia.
     state.source = 'extr'; state.groups = groups; state.qrByNum = qr; state.metaByNum = meta;
-    state.optFileName = pending.fileName; state.excluded = []; state.selection = [];
+    state.optFileName = pending.fileName;
     pending = null; persist(); render();
     var msg = groups.length + (state.lang === 'pt' ? ' rotas' : ' rutas') + ' · ' + Object.keys(qr).length + ' QR';
     if (skipped) msg += ' (' + skipped + (state.lang === 'pt' ? ' linhas de rota/CHP ignoradas' : ' filas de ruta/CHP ignoradas') + ')';
