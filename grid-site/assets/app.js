@@ -55,7 +55,7 @@
       no_saved: 'Nenhuma configuração salva encontrada.', hyb: 'HÍBRIDA',
       etq_cfg: 'Configurar etiqueta', width_cm: 'Largura (cm)', height_cm: 'Altura (cm)',
       pad_cm: 'Margem (cm)', etq_hint: 'O QR ocupa a lateral e o texto se ajusta à altura.', save: 'Salvar',
-      base_missing: 'Sem QR na base — clique em "Atualizar planilha" ou verifique a conexão com o Google no Grid.',
+      base_missing: 'Sem QR na base — clique em "Atualizar QR" ou verifique a conexão com o Google no Grid.',
       base_partial: 'sacas ainda sem QR na planilha.',
       base_ok: 'Todas as sacas têm QR real.',
       extraction: 'Extração (QR)', sync_now: 'Atualizar QR', manual_csv: 'CSV manual (avançado)',
@@ -64,7 +64,8 @@
       sync_no_qr_cols: 'Base lida, mas sem coluna de QR (CONTAINER_QR/CONTAINER_ID). Veja ⚙ → Diagnóstico.',
       settings: 'Configurações', advanced: 'Avançado', diag: 'Diagnóstico', qr_base_url: 'URL da base de QR (CSV publicado)',
       test_conn: 'Testar / atualizar agora', no_diag: 'Nenhuma tentativa ainda.', close: 'Fechar', upload_opt: 'Subir otimização',
-      clear_all: 'Limpar tudo (recomeçar)', clear_all_confirm: 'Isso apaga a otimização, seleção e QR salvos. Continuar?', cleared_ok: 'Tudo limpo!'
+      clear_all: 'Limpar tudo (recomeçar)', clear_all_confirm: 'Isso apaga a otimização, seleção e QR salvos. Continuar?', cleared_ok: 'Tudo limpo!',
+      change_opt: 'Trocar'
     },
     es: {
       site: 'Sitio', avail_bags: 'Sacas disponibles ↗', optimization: 'Optimización',
@@ -79,7 +80,7 @@
       no_saved: 'Ninguna configuración guardada encontrada.', hyb: 'HÍBRIDA',
       etq_cfg: 'Configurar etiqueta', width_cm: 'Ancho (cm)', height_cm: 'Alto (cm)',
       pad_cm: 'Margen (cm)', etq_hint: 'El QR ocupa el lateral y el texto se ajusta al alto.', save: 'Guardar',
-      base_missing: 'Sin QR en la base — hacé clic en "Actualizar planilla" o revisá la conexión con Google en Grid.',
+      base_missing: 'Sin QR en la base — hacé clic en "Actualizar QR" o revisá la conexión con Google en Grid.',
       base_partial: 'sacas todavía sin QR en la planilla.',
       base_ok: 'Todas las sacas tienen QR real.',
       extraction: 'Extração (QR)', sync_now: 'Actualizar QR', manual_csv: 'CSV manual (avanzado)',
@@ -88,7 +89,8 @@
       sync_no_qr_cols: 'Base leída, pero sin columna de QR (CONTAINER_QR/CONTAINER_ID). Mirá ⚙ → Diagnóstico.',
       settings: 'Configuración', advanced: 'Avanzado', diag: 'Diagnóstico', qr_base_url: 'URL de la base de QR (CSV publicado)',
       test_conn: 'Probar / actualizar ahora', no_diag: 'Ninguna tentativa aún.', close: 'Cerrar', upload_opt: 'Subir optimización',
-      clear_all: 'Limpiar todo (reiniciar)', clear_all_confirm: 'Esto borra la optimización, selección y QR guardados. ¿Continuar?', cleared_ok: '¡Todo limpio!'
+      clear_all: 'Limpiar todo (reiniciar)', clear_all_confirm: 'Esto borra la optimización, selección y QR guardados. ¿Continuar?', cleared_ok: '¡Todo limpio!',
+      change_opt: 'Cambiar'
     }
   };
   function t(k) { return (I18N[state.lang] && I18N[state.lang][k]) || I18N.pt[k] || k; }
