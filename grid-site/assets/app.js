@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var SCHEMA_VERSION = 4;
+  var SCHEMA_VERSION = 5;
 
   function defaultState() {
     return {
@@ -12,17 +12,17 @@
       source: null,            // 'opt' | 'extr'
       optFileName: null,
       lastSave: null,
-      // groups in file order. { name, fullName, planned, hybrid, count, realSacas: [num] }
-      groups: [],
-      excluded: [],            // global saca numbers hidden by the operator
-      selection: [],           // global saca numbers chosen to print
-      qrByNum: {},             // num -> real CONTAINER_QR string
-      metaByNum: {}            // num -> { agencia, veiculo, rotasacapl }
+      groups: [],              // { name, fullName, planned, hybrid, count, realSacas:[num] }
+      excluded: [],
+      selection: [],
+      qrByNum: {},             // num -> QR string to encode
+      metaByNum: {},           // num -> { agencia, veiculo(limpo), rotasacapl }
+      cfgEtq: { w: 12, h: 5, p: 0.4 }
     };
   }
 
   var state = defaultState();
-  var pending = null;          // { kind, headers, rows, fileName }
+  var pending = null;
 
   // ---------------------------------------------------------------- i18n
   var I18N = {
@@ -30,25 +30,35 @@
       site: 'Site', avail_bags: 'Sacas disponíveis ↗', optimization: 'Otimização',
       attach_csv: 'Anexar CSV', load_extr: 'Extração (QR)', load_saved: 'Recuperar salvo',
       import_kicker: 'Importe o arquivo de', optimization_up: 'OTIMIZAÇÃO',
-      opt_desc: 'A otimização define quais sacas pertencem a cada rota. A extração traz o QR real de cada saca para impressão.',
+      opt_desc: 'A otimização define quais sacas pertencem a cada rota. A extração traz o QR real, a agência e o modal de cada saca.',
       sel_all: 'Sel. todos', clear_sel: 'Limpar seleção', restore: 'Restaurar excluídas',
       view_extr: 'Dados extração', save_choice: 'Salvar escolha de sacas', copies: 'cópias',
-      print: 'Imprimir', extr_title: 'Dados da Extração NEX', cancel: 'Cancelar', import_btn: 'Importar',
-      bags: 'sacas', sel_group: 'Sel. grupo', no_qr: 'sem QR — importe a extração',
+      print: 'Imprimir', extr_title: 'Dados da Extração NEX', cancel: 'Cancelar',
+      bags: 'sacas', sel_group: 'Sel. grupo',
       last_save: 'Último salvamento: ', saved_ok: 'Escolha salva!', restored: 'Configuração recuperada!',
-      no_saved: 'Nenhuma configuração salva encontrada.', hyb: 'HÍBRIDA'
+      no_saved: 'Nenhuma configuração salva encontrada.', hyb: 'HÍBRIDA',
+      etq_cfg: 'Configurar etiqueta', width_cm: 'Largura (cm)', height_cm: 'Altura (cm)',
+      pad_cm: 'Margem (cm)', etq_hint: 'O QR ocupa a lateral e o texto se ajusta à altura.', save: 'Salvar',
+      base_missing: 'Sem QR na base — importe a extração para imprimir os códigos.',
+      base_partial: 'sacas ainda sem QR. Importe/atualize a extração.',
+      base_ok: 'Base de QR carregada.'
     },
     es: {
       site: 'Sitio', avail_bags: 'Sacas disponibles ↗', optimization: 'Optimización',
       attach_csv: 'Adjuntar CSV', load_extr: 'Extração (QR)', load_saved: 'Recuperar guardado',
       import_kicker: 'Importá el archivo de', optimization_up: 'OPTIMIZACIÓN',
-      opt_desc: 'La optimización define qué sacas pertenecen a cada ruta. La extração trae el QR real de cada saca para imprimir.',
+      opt_desc: 'La optimización define qué sacas pertenecen a cada ruta. La extração trae el QR real, la agencia y el modal de cada saca.',
       sel_all: 'Sel. todos', clear_sel: 'Limpiar selección', restore: 'Restaurar excluidas',
       view_extr: 'Datos extración', save_choice: 'Guardar elección de sacas', copies: 'copias',
-      print: 'Imprimir', extr_title: 'Datos de la Extración NEX', cancel: 'Cancelar', import_btn: 'Importar',
-      bags: 'sacas', sel_group: 'Sel. grupo', no_qr: 'sin QR — importá la extração',
+      print: 'Imprimir', extr_title: 'Datos de la Extración NEX', cancel: 'Cancelar',
+      bags: 'sacas', sel_group: 'Sel. grupo',
       last_save: 'Último guardado: ', saved_ok: '¡Elección guardada!', restored: '¡Configuración recuperada!',
-      no_saved: 'Ninguna configuración guardada encontrada.', hyb: 'HÍBRIDA'
+      no_saved: 'Ninguna configuración guardada encontrada.', hyb: 'HÍBRIDA',
+      etq_cfg: 'Configurar etiqueta', width_cm: 'Ancho (cm)', height_cm: 'Alto (cm)',
+      pad_cm: 'Margen (cm)', etq_hint: 'El QR ocupa el lateral y el texto se ajusta al alto.', save: 'Guardar',
+      base_missing: 'Sin QR en la base — importá la extração para imprimir los códigos.',
+      base_partial: 'sacas todavía sin QR. Importá/actualizá la extração.',
+      base_ok: 'Base de QR cargada.'
     }
   };
   function t(k) { return (I18N[state.lang] && I18N[state.lang][k]) || I18N.pt[k] || k; }
@@ -56,8 +66,7 @@
     document.querySelectorAll('[data-i18n]').forEach(function (el) {
       var k = el.getAttribute('data-i18n'); if (I18N[state.lang][k]) el.textContent = I18N[state.lang][k];
     });
-    var s = document.getElementById('searchInput');
-    if (s) s.placeholder = state.lang === 'pt' ? 'Buscar rota (ex: G1)…' : 'Buscar ruta (ej: G1)…';
+    var s = $('searchInput'); if (s) s.placeholder = state.lang === 'pt' ? 'Buscar rota (ex: G1)…' : 'Buscar ruta (ej: G1)…';
   }
 
   // ---------------------------------------------------------------- helpers
@@ -72,11 +81,23 @@
     var el = $('toast'); el.textContent = msg;
     el.className = 'toast show ' + (ok === false ? 'err' : 'ok');
     if (toastTimer) clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { el.className = 'toast'; }, 2200);
+    toastTimer = setTimeout(function () { el.className = 'toast'; }, 2400);
   }
   function excludedSet() { return new Set(state.excluded); }
   function selectionSet() { return new Set(state.selection); }
   function prefixOf(id) { return String(id || '').split(/[_-]/)[0].toUpperCase(); }
+
+  // Limpa o nome do veículo -> MODAL curto (ex.: "Veiculo de Passeio Extra 6h" -> "PASSEIO 6H")
+  function limparVeiculo(txt) {
+    if (!txt) return '';
+    return String(txt)
+      .replace(/Ve[ií]culos? de Passeio Extra 4h/ig, 'PASSEIO 4H')
+      .replace(/Ve[ií]culos? de Passeio Extra 6h/ig, 'PASSEIO 6H')
+      .replace(/Ve[ií]culos? de Passeio 4h/ig, 'PASSEIO 4H')
+      .replace(/Ve[ií]culos? de Passeio 6h/ig, 'PASSEIO 6H')
+      .replace(/Ve[ií]culos? de Passeio/ig, 'PASSEIO')
+      .trim().toUpperCase();
+  }
 
   // ---------------------------------------------------------------- persistence
   function persist() { state.updatedAt = new Date().toISOString(); window.GridStore.saveDebounced(state, 400); }
@@ -84,10 +105,12 @@
   async function init() {
     var loaded = await window.GridStore.load();
     if (loaded && loaded.schemaVersion === SCHEMA_VERSION) state = loaded;
+    if (!state.cfgEtq) state.cfgEtq = { w: 12, h: 5, p: 0.4 };
     var badge = $('storageBadge');
     if (window.GridStore.isRunningInGrid()) { badge.textContent = 'Grid'; badge.classList.remove('local'); }
-    else { badge.textContent = state.lang === 'pt' ? 'Local (preview)' : 'Local (preview)'; badge.classList.add('local'); }
+    else { badge.textContent = 'Local (preview)'; badge.classList.add('local'); }
     $('langSelect').value = state.lang;
+    $('siteSelect').value = state.site;
     applyLang();
     render();
   }
@@ -117,8 +140,7 @@
   }
 
   function chooseFile(kind) {
-    var input = $('fileInput');
-    input.value = '';
+    var input = $('fileInput'); input.value = '';
     input.onchange = function (e) {
       var file = e.target.files && e.target.files[0]; if (!file) return;
       var reader = new FileReader();
@@ -128,8 +150,7 @@
         pending = { kind: kind, headers: rows[0].map(function (h) { return h.trim(); }),
           rows: rows.slice(1).filter(function (r) { return r.some(function (v) { return v.trim() !== ''; }); }),
           fileName: file.name };
-        if (kind === 'opt') importOptimization();
-        else importExtracao();
+        if (kind === 'opt') importOptimization(); else importExtracao();
       };
       reader.readAsText(file, 'UTF-8');
     };
@@ -159,14 +180,9 @@
     });
     if (!groups.length) { toast('Nenhuma rota híbrida (NEX) encontrada no arquivo.', false); return; }
 
-    // Global running numbering, skipping any still-excluded numbers.
     assignRunningNumbers(groups);
-    state.source = 'opt';
-    state.groups = groups;
-    state.optFileName = pending.fileName;
-    state.selection = [];
-    pending = null;
-    persist(); render();
+    state.source = 'opt'; state.groups = groups; state.optFileName = pending.fileName; state.selection = [];
+    pending = null; persist(); render();
     toast(groups.length + (state.lang === 'pt' ? ' rotas carregadas' : ' rutas cargadas'), true);
   }
 
@@ -181,72 +197,68 @@
 
   function importExtracao() {
     var h = pending.headers;
-    var iRota = col(h, ['ROTASACA']);            // global saca number
+    var iRota = col(h, ['ROTASACA']);
     var iOt = col(h, ['ROTAOT', 'ID OTIMIZADO']);
     var iPl = col(h, ['ROTAPL', 'ID PLANEJADO']);
-    var iQr = col(h, ['CONTAINER_QR']);
+    var iQr = col(h, ['CONTAINER_QR', 'CÓDIGO QR', 'CODIGO QR', 'CODIGO', 'QR']);
+    var iCid = col(h, ['CONTAINER_ID']);
     var iCode = col(h, ['ROTASACAPL']);
     var iAg = col(h, ['AGENCIA', 'AGÊNCIA']);
-    var iVe = col(h, ['VEICULO', 'VEÍCULO']);
+    var iVe = col(h, ['VEICULO', 'VEÍCULO', 'MODAL']);
     if (iRota === -1 || iOt === -1) { toast('CSV de extração inválido: faltam ROTASACA/ROTAOT.', false); return; }
 
     var byGroup = {}, order = [], qr = {}, meta = {}, skipped = 0;
     pending.rows.forEach(function (r) {
       var numRaw = String(r[iRota] || '').trim();
-      if (!/^\d+$/.test(numRaw)) { skipped++; return; }  // only numeric = NEX sack rows
+      if (!/^\d+$/.test(numRaw)) { skipped++; return; }   // só sacas NEX (ROTASACA numérica)
       var num = parseInt(numRaw, 10);
       var full = String(r[iOt] || '').trim().toUpperCase(); if (!full) return;
       var name = prefixOf(full);
       if (!byGroup[name]) { byGroup[name] = { name: name, fullName: full,
-        planned: iPl !== -1 ? String(r[iPl] || '').trim().toUpperCase() : '', hybrid: true, count: 0, nums: [] };
-        order.push(name); }
+        planned: iPl !== -1 ? String(r[iPl] || '').trim().toUpperCase() : '', nums: [] }; order.push(name); }
       byGroup[name].nums.push(num);
-      if (iQr !== -1 && r[iQr]) qr[num] = String(r[iQr]).trim();
+
+      var qrStr = iQr !== -1 ? String(r[iQr] || '').trim() : '';
+      if (!qrStr && iCid !== -1 && String(r[iCid] || '').trim()) {
+        var cid = parseInt(r[iCid], 10);
+        qrStr = JSON.stringify({ container_id: isNaN(cid) ? String(r[iCid]).trim() : cid, facility_id: state.site, assignment: numRaw });
+      }
+      if (qrStr) qr[num] = qrStr;
       meta[num] = { agencia: iAg !== -1 ? String(r[iAg] || '').trim() : '',
-        veiculo: iVe !== -1 ? String(r[iVe] || '').trim() : '',
+        veiculo: iVe !== -1 ? limparVeiculo(r[iVe]) : '',
         rotasacapl: iCode !== -1 ? String(r[iCode] || '').trim() : '' };
     });
     if (!order.length) { toast('Nenhuma saca NEX (ROTASACA numérica) encontrada.', false); return; }
 
     var groups = order.map(function (name) {
-      var g = byGroup[name];
-      g.nums.sort(function (a, b) { return a - b; });
-      return { name: g.name, fullName: g.fullName, planned: g.planned, hybrid: true,
-        count: g.nums.length, realSacas: g.nums };
+      var g = byGroup[name]; g.nums.sort(function (a, b) { return a - b; });
+      return { name: g.name, fullName: g.fullName, planned: g.planned, hybrid: true, count: g.nums.length, realSacas: g.nums };
     });
 
-    state.source = 'extr';
-    state.groups = groups;
-    state.qrByNum = qr;
-    state.metaByNum = meta;
-    state.optFileName = pending.fileName;
-    state.excluded = [];
-    state.selection = [];
-    pending = null;
-    persist(); render();
+    state.source = 'extr'; state.groups = groups; state.qrByNum = qr; state.metaByNum = meta;
+    state.optFileName = pending.fileName; state.excluded = []; state.selection = [];
+    pending = null; persist(); render();
     var msg = groups.length + (state.lang === 'pt' ? ' rotas' : ' rutas') + ' · ' + Object.keys(qr).length + ' QR';
     if (skipped) msg += ' (' + skipped + (state.lang === 'pt' ? ' linhas de rota/CHP ignoradas' : ' filas de ruta/CHP ignoradas') + ')';
     toast(msg, true);
   }
 
   function clearOptimization() {
-    state.source = null; state.groups = []; state.selection = []; state.excluded = [];
-    state.optFileName = null;
+    state.source = null; state.groups = []; state.selection = []; state.excluded = []; state.optFileName = null;
     persist(); render();
   }
-
   function restoreSaved() {
     if (!state.groups.length) { toast(t('no_saved'), false); return; }
-    render();
-    toast(t('restored'), true);
+    render(); toast(t('restored'), true);
   }
 
   // ---------------------------------------------------------------- rendering
   function renderableNums(group) {
-    if (state.source === 'opt') { assignRunningNumbers(state.groups); }
+    if (state.source === 'opt') assignRunningNumbers(state.groups);
     var skip = excludedSet();
     return group.realSacas.filter(function (n) { return !skip.has(n); });
   }
+  function hasQr(num) { return !!state.qrByNum[num]; }
 
   function render() {
     var has = state.groups.length > 0;
@@ -255,8 +267,19 @@
     $('activeFile').style.display = state.optFileName ? 'inline-flex' : 'none';
     if (state.optFileName) $('activeFileName').textContent = state.optFileName;
     $('lastSave').textContent = state.lastSave ? (t('last_save') + state.lastSave) : '';
-    if (has) renderRoutes();
+    $('btnCfgEtq').style.display = $('formatSelect').value === 'etiqueta' ? 'inline-flex' : 'none';
+    if (has) { renderBanner(); renderRoutes(); }
     updatePrintBar();
+  }
+
+  function renderBanner() {
+    var b = $('baseBanner'), msg = $('baseBannerMsg');
+    var totalNums = 0, withQr = 0;
+    state.groups.forEach(function (g) { renderableNums(g).forEach(function (n) { totalNums++; if (hasQr(n)) withQr++; }); });
+    if (totalNums === 0) { b.style.display = 'none'; return; }
+    if (withQr === 0) { b.className = 'banner'; msg.textContent = t('base_missing'); b.style.display = 'flex'; }
+    else if (withQr < totalNums) { b.className = 'banner'; msg.textContent = (totalNums - withQr) + ' ' + t('base_partial'); b.style.display = 'flex'; }
+    else { b.className = 'banner ok'; msg.textContent = t('base_ok'); b.style.display = 'flex'; }
   }
 
   function renderRoutes() {
@@ -268,9 +291,7 @@
     state.groups.forEach(function (group) {
       if (term && group.name.indexOf(term) === -1) return;
       var nums = renderableNums(group);
-
-      var card = document.createElement('div');
-      card.className = 'route-card';
+      var card = document.createElement('div'); card.className = 'route-card';
       var head = '<div class="route-head">' +
         '<span class="name">' + esc(group.name) + '</span>' +
         '<span class="badge">' + nums.length + ' ' + t('bags') + '</span>' +
@@ -281,27 +302,21 @@
         '</div>';
       var grid = '<div class="saca-grid">';
       nums.forEach(function (num) {
-        var hasQr = !!state.qrByNum[num];
         var isSel = sel.has(num);
-        var cls = 'saca' + (isSel ? ' selected' : '') + (hasQr ? '' : ' disabled');
-        var title = hasQr ? '' : ' title="' + t('no_qr') + '"';
-        grid += '<button class="' + cls + '" data-num="' + num + '"' + title + '>' + num +
-          (hasQr ? '<span class="rm" data-rm="' + num + '">&times;</span>' : '') + '</button>';
+        grid += '<button class="saca' + (isSel ? ' selected' : '') + '" data-num="' + num + '">' + num +
+          '<span class="dot' + (hasQr(num) ? ' has' : '') + '" title="' + (hasQr(num) ? 'QR' : 'sem QR') + '"></span>' +
+          '<span class="rm" data-rm="' + num + '">&times;</span></button>';
       });
       grid += '</div>';
-      card.innerHTML = head + grid;
-      wrap.appendChild(card);
+      card.innerHTML = head + grid; wrap.appendChild(card);
     });
 
     wrap.querySelectorAll('.saca').forEach(function (btn) {
       var num = parseInt(btn.getAttribute('data-num'), 10);
-      if (btn.classList.contains('disabled')) return;
       btn.addEventListener('click', function (e) {
         if (e.target.getAttribute('data-rm')) return;
-        var s = selectionSet();
-        if (s.has(num)) s.delete(num); else s.add(num);
-        state.selection = Array.from(s);
-        persist(); renderRoutes(); updatePrintBar();
+        var s = selectionSet(); if (s.has(num)) s.delete(num); else s.add(num);
+        state.selection = Array.from(s); persist(); renderRoutes(); updatePrintBar();
       });
     });
     wrap.querySelectorAll('.rm').forEach(function (x) {
@@ -310,7 +325,7 @@
         var num = parseInt(x.getAttribute('data-rm'), 10);
         var ex = excludedSet(); ex.add(num); state.excluded = Array.from(ex);
         var s = selectionSet(); s.delete(num); state.selection = Array.from(s);
-        persist(); renderRoutes(); updatePrintBar();
+        persist(); render();
       });
     });
     wrap.querySelectorAll('.selGroup').forEach(function (b) {
@@ -319,36 +334,23 @@
   }
 
   function selectGroup(name) {
-    var group = state.groups.filter(function (g) { return g.name === name; })[0];
-    if (!group) return;
-    var nums = renderableNums(group).filter(function (n) { return !!state.qrByNum[n]; });
+    var group = state.groups.filter(function (g) { return g.name === name; })[0]; if (!group) return;
+    var nums = renderableNums(group);
     var s = selectionSet();
     var allSel = nums.length > 0 && nums.every(function (n) { return s.has(n); });
     nums.forEach(function (n) { if (allSel) s.delete(n); else s.add(n); });
-    state.selection = Array.from(s);
-    persist(); renderRoutes(); updatePrintBar();
+    state.selection = Array.from(s); persist(); renderRoutes(); updatePrintBar();
   }
-
   function selectAllVisible() {
     var term = ($('searchInput').value || '').trim().toUpperCase();
-    var s = selectionSet(); var all = [];
-    state.groups.forEach(function (g) {
-      if (term && g.name.indexOf(term) === -1) return;
-      renderableNums(g).forEach(function (n) { if (state.qrByNum[n]) all.push(n); });
-    });
+    var s = selectionSet(), all = [];
+    state.groups.forEach(function (g) { if (term && g.name.indexOf(term) === -1) return; renderableNums(g).forEach(function (n) { all.push(n); }); });
     var allSel = all.length > 0 && all.every(function (n) { return s.has(n); });
     all.forEach(function (n) { if (allSel) s.delete(n); else s.add(n); });
-    state.selection = Array.from(s);
-    persist(); renderRoutes(); updatePrintBar();
+    state.selection = Array.from(s); persist(); renderRoutes(); updatePrintBar();
   }
+  function updatePrintBar() { var n = state.selection.length; $('printCount').textContent = n; $('btnPrint').disabled = (n === 0); }
 
-  function updatePrintBar() {
-    var n = state.selection.length;
-    $('printCount').textContent = n;
-    $('btnPrint').disabled = (n === 0);
-  }
-
-  // ---------------------------------------------------------------- save
   function saveChoice() {
     state.lastSave = new Date().toLocaleString(state.lang === 'pt' ? 'pt-BR' : 'es-AR');
     window.GridStore.saveNow(state);
@@ -359,84 +361,115 @@
   // ---------------------------------------------------------------- extraction viewer
   function openExtracao() {
     var nums = Object.keys(state.metaByNum).map(Number).sort(function (a, b) { return a - b; });
-    var head = $('extracaoHead'), body = $('extracaoBody');
-    head.innerHTML = '<tr><th>ROTASACA</th><th>ROTA</th><th>ROTASACAPL</th><th>AGENCIA</th><th>VEICULO</th><th>QR</th></tr>';
     var numToGroup = {};
     state.groups.forEach(function (g) { (g.realSacas || []).forEach(function (n) { numToGroup[n] = g.name; }); });
-    body.innerHTML = nums.map(function (n) {
+    $('extracaoHead').innerHTML = '<tr><th>ROTASACA</th><th>ROTA</th><th>ROTASACAPL</th><th>AGÊNCIA</th><th>MODAL</th><th>QR</th></tr>';
+    $('extracaoBody').innerHTML = nums.map(function (n) {
       var m = state.metaByNum[n] || {};
       return '<tr><td>' + n + '</td><td>' + esc(numToGroup[n] || '') + '</td><td>' + esc(m.rotasacapl || '') +
-        '</td><td>' + esc(m.agencia || '') + '</td><td>' + esc(m.veiculo || '') + '</td><td>' +
-        (state.qrByNum[n] ? '✓' : '—') + '</td></tr>';
-    }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text-2);padding:24px">Sem dados de extração. Importe a extração (QR).</td></tr>';
+        '</td><td>' + esc(m.agencia || '') + '</td><td>' + esc(m.veiculo || '') + '</td><td>' + (hasQr(n) ? '✓' : '—') + '</td></tr>';
+    }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text-2);padding:24px">Sem dados. Importe a extração (QR).</td></tr>';
     $('extracaoFoot').textContent = nums.length + (state.lang === 'pt' ? ' sacas na extração.' : ' sacas en la extración.');
     $('extracaoOverlay').classList.add('open');
   }
 
   // ---------------------------------------------------------------- print
+  function makeQrSvg(txt) {
+    if (!txt) return '<div style="font:900 11pt Arial;color:#999">QR PENDENTE</div>';
+    var qr = window.qrcode(0, 'M'); qr.addData(txt); qr.make();
+    return qr.createSvgTag({ cellSize: 3, margin: 1, scalable: true });
+  }
+  function selectedItems() {
+    var numToGroup = {}; state.groups.forEach(function (g) { (g.realSacas || []).forEach(function (n) { numToGroup[n] = g; }); });
+    return state.selection.slice().sort(function (a, b) { return a - b; }).map(function (num) {
+      var g = numToGroup[num]; if (!g) return null;
+      var m = state.metaByNum[num] || {};
+      return { num: num, route: g.name, agencia: m.agencia || '', modal: m.veiculo || '', qr: state.qrByNum[num] || '' };
+    }).filter(Boolean);
+  }
+
+  function dynStyle(css) {
+    var el = $('dyn-print'); if (!el) { el = document.createElement('style'); el.id = 'dyn-print'; document.head.appendChild(el); }
+    el.textContent = css || '';
+  }
+
   function printSelection() {
     var fmt = $('formatSelect').value;
-    var items = [];
-    var numToGroup = {};
-    state.groups.forEach(function (g) { (g.realSacas || []).forEach(function (n) { numToGroup[n] = g; }); });
-    state.selection.slice().sort(function (a, b) { return a - b; }).forEach(function (num) {
-      var g = numToGroup[num]; if (!g) return;
-      items.push({ num: num, route: g.name, qr: state.qrByNum[num] || '' });
-    });
-    if (!items.length) return;
+    var items = selectedItems(); if (!items.length) return;
+    var area = $('print-area'); var html = '';
+    dynStyle('');
 
-    var area = $('print-area');
-    var html = '';
     if (fmt === 'cartao') {
       for (var i = 0; i < items.length; i += 4) {
-        var chunk = items.slice(i, i + 4);
+        var ch = items.slice(i, i + 4);
         html += '<div class="print-page"><div class="print-grid">';
-        chunk.forEach(function (it) {
+        ch.forEach(function (it) {
           html += '<div class="card-et"><div class="c-num"><h1>' + esc(it.num) + '</h1></div>' +
             '<div class="c-route"><h2>' + esc(it.route) + '</h2></div>' +
-            '<div class="c-qr" data-qr="' + esc(it.qr) + '"></div></div>';
+            '<div class="c-field"><span>' + esc(it.agencia || '—') + '</span></div>' +
+            '<div class="c-field"><span>' + esc(it.modal || '—') + '</span></div>' +
+            '<div class="c-qr">' + makeQrSvg(it.qr) + '</div></div>';
         });
-        for (var j = chunk.length; j < 4; j++) html += '<div class="card-et empty"></div>';
+        for (var j = ch.length; j < 4; j++) html += '<div class="card-et empty"></div>';
         html += '</div></div>';
       }
-    } else {
+    } else if (fmt === 'folha') {
       items.forEach(function (it) {
-        html += '<div class="print-page"><div class="print-grid">' +
-          '<div class="card-et" style="width:150mm;height:200mm"><div class="c-num" style="height:100mm"><h1 style="font-size:160pt">' + esc(it.num) + '</h1></div>' +
-          '<div class="c-route" style="height:34mm"><h2 style="font-size:70pt">' + esc(it.route) + '</h2></div>' +
-          '<div class="c-qr" data-qr="' + esc(it.qr) + '"></div></div>' +
+        var qr = makeQrSvg(it.qr);
+        function half(side) {
+          return '<div class="quad ' + side + '"><div class="fbox">' +
+            '<div class="fcell qN">' + qr + '</div>' +
+            '<div class="fcell num"><span class="rot f-num">' + esc(it.num) + '</span></div>' +
+            '<div class="fcell qS">' + qr + '</div>' +
+            '<div class="fcell ag"><span class="rot f-info">' + esc(it.agencia || '—') + '</span></div>' +
+            '<div class="fcell rt f-gray"><span class="rot f-route">' + esc(it.route) + '</span></div>' +
+            '<div class="fcell md"><span class="rot f-info">' + esc(it.modal || '—') + '</span></div>' +
+            '</div></div>';
+        }
+        html += '<div class="folha-page">' + half('oeste') + half('leste') + '</div>';
+      });
+    } else { // etiqueta
+      var c = state.cfgEtq, inner = (c.h - c.p * 2);
+      var fs = (inner / 4 * 0.82).toFixed(2) + 'cm';
+      dynStyle('@media print{@page{size:' + c.w + 'cm ' + c.h + 'cm;margin:0}' +
+        '.etq{width:' + c.w + 'cm;height:' + c.h + 'cm;padding:' + c.p + 'cm;--etq-fs:' + fs + '}' +
+        '.etq .qr{width:' + inner + 'cm;height:' + inner + 'cm}}');
+      items.forEach(function (it) {
+        html += '<div class="etq"><div class="qr">' + makeQrSvg(it.qr) + '</div><div class="lines">' +
+          '<div class="ln"><span class="k">SACA:</span>' + esc(it.num) + '</div>' +
+          '<div class="ln"><span class="k">ROTA:</span>' + esc(it.route) + '</div>' +
+          '<div class="ln"><span class="k">AGÊNCIA:</span>' + esc(it.agencia || '—') + '</div>' +
+          '<div class="ln"><span class="k">MODAL:</span>' + esc(it.modal || '—') + '</div>' +
           '</div></div>';
       });
     }
+
     area.innerHTML = html;
+    setTimeout(function () { window.print(); setTimeout(function () { area.innerHTML = ''; dynStyle(''); }, 800); }, 350);
+  }
 
-    area.querySelectorAll('.c-qr').forEach(function (el) {
-      var txt = el.getAttribute('data-qr'); if (!txt) return;
-      var qr = window.qrcode(0, 'M'); qr.addData(txt); qr.make();
-      el.innerHTML = qr.createSvgTag({ cellSize: 3, margin: 2, scalable: true });
-    });
-
-    setTimeout(function () {
-      window.print();
-      setTimeout(function () { area.innerHTML = ''; }, 800);
-    }, 350);
+  // ---------------------------------------------------------------- config etiqueta
+  function openCfg() {
+    $('cfgW').value = state.cfgEtq.w; $('cfgH').value = state.cfgEtq.h; $('cfgP').value = state.cfgEtq.p;
+    $('cfgOverlay').classList.add('open');
+  }
+  function saveCfg() {
+    state.cfgEtq = { w: parseFloat($('cfgW').value) || 12, h: parseFloat($('cfgH').value) || 5, p: parseFloat($('cfgP').value) || 0.4 };
+    persist(); $('cfgOverlay').classList.remove('open'); toast(t('saved_ok'), true);
   }
 
   // ---------------------------------------------------------------- wiring
   document.addEventListener('DOMContentLoaded', function () {
-    $('btnAnexar').addEventListener('click', function () { chooseFile('opt'); });
-    $('btnAnexar2').addEventListener('click', function () { chooseFile('opt'); });
-    $('btnExtracao').addEventListener('click', function () { chooseFile('extr'); });
-    $('btnExtracao2').addEventListener('click', function () { chooseFile('extr'); });
-    $('btnRecuperar').addEventListener('click', restoreSaved);
-    $('btnRecuperar2').addEventListener('click', restoreSaved);
+    ['btnAnexar', 'btnAnexar2'].forEach(function (id) { $(id).addEventListener('click', function () { chooseFile('opt'); }); });
+    ['btnExtracao', 'btnExtracao2', 'btnBannerExtr'].forEach(function (id) { $(id).addEventListener('click', function () { chooseFile('extr'); }); });
+    ['btnRecuperar', 'btnRecuperar2'].forEach(function (id) { $(id).addEventListener('click', restoreSaved); });
     $('btnLimparOtim').addEventListener('click', clearOptimization);
 
     $('searchInput').addEventListener('input', renderRoutes);
     $('btnSelAll').addEventListener('click', selectAllVisible);
     $('btnClearSel').addEventListener('click', function () { state.selection = []; persist(); renderRoutes(); updatePrintBar(); });
     $('btnRestore').addEventListener('click', function () {
-      state.excluded = []; persist(); renderRoutes(); updatePrintBar();
+      state.excluded = []; persist(); render();
       toast(state.lang === 'pt' ? 'Sacas restauradas!' : '¡Sacas restauradas!', true);
     });
     $('btnVerExtracao').addEventListener('click', openExtracao);
@@ -445,6 +478,13 @@
 
     $('btnSalvar').addEventListener('click', saveChoice);
     $('btnPrint').addEventListener('click', printSelection);
+    $('formatSelect').addEventListener('change', function () {
+      $('btnCfgEtq').style.display = this.value === 'etiqueta' ? 'inline-flex' : 'none';
+    });
+    $('btnCfgEtq').addEventListener('click', openCfg);
+    $('closeCfg').addEventListener('click', function () { $('cfgOverlay').classList.remove('open'); });
+    $('cancelCfg').addEventListener('click', function () { $('cfgOverlay').classList.remove('open'); });
+    $('saveCfg').addEventListener('click', saveCfg);
 
     $('siteSelect').addEventListener('change', function () { state.site = this.value; persist(); });
     $('langSelect').addEventListener('change', function () { state.lang = this.value; persist(); applyLang(); render(); });

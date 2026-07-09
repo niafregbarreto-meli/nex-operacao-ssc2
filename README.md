@@ -50,11 +50,20 @@ grep -c "localStorage\|sessionStorage\|cdn\.\|cdnjs\|tailwindcss" dist/nex-ssc2-
 2. **Grade de sacas** — cada rota mostra seus números. Clicar seleciona
    (azul); o × exclui uma saca pontual (fica um buraco na numeração, igual à
    ferramenta real); "Sel. grupo" / "Sel. todos" / "Restaurar excluídas".
-   Um botão **só fica habilitado quando tem QR real** (da extração) — fiel ao
-   original, que cinza as sacas sem QR na base em vez de inventar um.
-3. **Imprimir** — CARTÃO (4x1, A4) ou FOLHA (1x1). Cada cartão: número da
-   saca (grande) + prefixo da rota + QR (o `CONTAINER_QR` verbatim que o
-   sistema oficial da MELI já gerou).
+   Todas as sacas são **sempre selecionáveis**; um ponto verde/cinza no canto
+   indica se aquela saca já tem QR real da base, e um banner avisa quando a
+   base ainda não foi carregada.
+3. **Imprimir** — três formatos fiéis aos PDFs da ferramenta atual:
+   - **CARTÃO (4x1)**: número (grande) · rota (faixa cinza) · **AGÊNCIA** ·
+     **MODAL** (veículo limpo, ex. "PASSEIO 6H") · QR.
+   - **FOLHA (1x1)**: etiqueta grande dobrável (espelho oeste/leste, QR em
+     cima e embaixo, número rotacionado, agência/rota/modal na lateral).
+   - **ETIQUETA**: tamanho configurável (padrão 12×5 cm) com QR na lateral e
+     as linhas SACA / ROTA / AGÊNCIA / MODAL.
+   O QR é o `CONTAINER_QR` verbatim do sistema oficial (ou reconstruído
+   `{container_id, facility_id, assignment}` quando a base traz só o
+   `CONTAINER_ID`). Veículo é normalizado para o modal curto igual ao
+   `limparTextoVeiculo` original.
 
 O QR nunca é inventado: vem pré-impresso pela plataforma oficial
 (`envios.adminml.com/logistics/sorting/containers`) e chega aqui via a
@@ -88,10 +97,21 @@ compartilhados na conversa; a integração com a API do Grid e o
 `window.GRID.state` em produção precisam ser validados de um ambiente com
 VPN corporativa da MELI.
 
-## Ainda por confirmar / próximos passos
+## Próximo passo importante: auto-carga da base via Grid Sheets
 
-- Ajustar o visual fino ao guia Andes oficial (tipografia Proxima Nova só
-  carrega dentro da rede MELI; localmente usa fallback de sistema).
-- Definir se o site é fixo (SSC2) ou multi-site.
-- Confirmar o layout exato de impressão desejado (tamanho de etiqueta,
-  campos: só rota, ou também agência/veículo como na versão CHP).
+Hoje a base de QR/agência/modal entra por **upload de CSV** (botão "Extração
+(QR)"). O usuário confirmou que o Grid lê planilhas do Google direto (só
+leitura) — isso corresponde ao SDK `Grid.sheets.get(sheetId, 'TAB')`. O
+plano é, rodando dentro do Grid, ler automaticamente a aba de extração da
+planilha "SSC2 BASE 2026" (`1w31lqax56lMcjbvoj5VhdDf9gwEYSh2ldjMuTb9WV8Y`,
+atualizada por queries diariamente), sem passo manual. Não foi implementado
+ainda porque não dá para testar `Grid.sheets` fora do Grid — precisa ser
+feito/validado num ambiente com Grid + VPN.
+
+## Ainda por confirmar
+
+- Tipografia: Proxima Nova só carrega dentro da rede MELI; localmente usa
+  fallback de sistema.
+- Site fixo (SSC2) ou multi-site.
+- Se querem o QR também na ETIQUETA (foi adicionado) ou só as 4 linhas de
+  texto como no PDF original.
