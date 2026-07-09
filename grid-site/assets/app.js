@@ -12,7 +12,7 @@
   // Fallback via SDK do Grid (precisa Google conectado no Grid) — usado só se o
   // fetch do CSV publicado for bloqueado por CSP no iframe do Grid.
   var GRID_SHEET_ID = '1w31lqax56lMcjbvoj5VhdDf9gwEYSh2ldjMuTb9WV8Y';
-  var GRID_SHEET_TABS = ['SEPARACAO_NEX', 'EXTRACAO', 'Extração', 'EXTRAÇÃO'];
+  var GRID_SHEET_TABS = ['SEPARACAO_NEX', 'EXTRACAO_NEX', 'EXTRACAO', 'Extração', 'EXTRAÇÃO', 'EXTRAÇÃO_NEX', 'BASE EXTRACAO', 'BASE EXTRAÇÃO'];
 
   // Diagnóstico da última tentativa de carga da base (mostrado no ⚙).
   var qrDiag = { attempts: [] };
@@ -282,11 +282,17 @@
     }
   }
 
+  // Testa TODAS as abas candidatas (não para na primeira que responder) —
+  // uma aba pode existir e responder sem ter a coluna de QR (ex.:
+  // SEPARACAO_NEX). Só aceita de vez uma aba que realmente tenha
+  // CONTAINER_QR/CONTAINER_ID; senão guarda a primeira que respondeu como
+  // último recurso e continua procurando.
   async function tryGridSheets() {
     if (!ensureGridSheetsReady()) {
       qrDiag.attempts.push({ via: 'Grid.sheets', ok: false, error: window.GridStore.isRunningInGrid() ? 'Grid.sheets indisponível' : 'fora do Grid' });
       return null;
     }
+    var fallback = null;
     for (var i = 0; i < GRID_SHEET_TABS.length; i++) {
       var tab = GRID_SHEET_TABS[i];
       var attempt = { via: 'Grid.sheets', tab: tab, ok: false };
@@ -298,7 +304,11 @@
         if (parsed && parsed.rows.length) {
           attempt.ok = true; attempt.columns = parsed.headers; attempt.rowCount = parsed.rows.length; attempt.sample = parsed.rows.slice(0, 2);
           qrDiag.attempts.push(attempt);
-          return parsed;
+          var hasQrCol = col(parsed.headers, ['CONTAINER_QR', 'CÓDIGO QR', 'CODIGO QR', 'CODIGO', 'QR']) !== -1 ||
+            col(parsed.headers, ['CONTAINER_ID']) !== -1;
+          if (hasQrCol) return parsed;
+          if (!fallback) fallback = parsed;
+          continue;
         }
         attempt.error = 'vazio'; qrDiag.attempts.push(attempt);
       } catch (err) {
@@ -306,7 +316,7 @@
         qrDiag.attempts.push(attempt);
       }
     }
-    return null;
+    return fallback;
   }
 
   async function loadQrBase(silent) {
