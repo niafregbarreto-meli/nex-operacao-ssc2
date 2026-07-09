@@ -197,6 +197,20 @@
     return null;
   }
 
+  // Tenta o nome do tab puro primeiro (funciona na maioria dos casos); se
+  // falhar, tenta A1 notation completa — variação documentada da mesma API.
+  async function fetchSheetData() {
+    try {
+      return await window.Grid.sheets.get(GRID_SHEET_ID, GRID_SHEET_TAB);
+    } catch (err) {
+      try {
+        return await window.Grid.sheets.get(GRID_SHEET_ID, GRID_SHEET_TAB + '!A:Z');
+      } catch (err2) {
+        throw err; // reporta o erro original, mais provável de ser o real
+      }
+    }
+  }
+
   async function syncFromSheet(silent) {
     if (!ensureGridSheetsReady()) {
       setSyncStatus(window.GridStore.isRunningInGrid() ? t('sync_no_api') : t('sync_not_grid'), silent ? null : 'err');
@@ -204,7 +218,7 @@
     }
     setSyncStatus(t('sync_syncing'));
     try {
-      var data = await window.Grid.sheets.get(GRID_SHEET_ID, GRID_SHEET_TAB);
+      var data = await fetchSheetData();
       var parsed = normalizeSheetRows(data);
       if (!parsed || !parsed.rows.length) {
         setSyncStatus(t('sync_fail') + 'planilha vazia ou aba "' + GRID_SHEET_TAB + '" não encontrada.', 'err');
