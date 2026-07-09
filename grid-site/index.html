@@ -114,6 +114,18 @@
   </div>
 </div>
 
+<!-- Renumber saca modal -->
+<div class="overlay" id="renumOverlay">
+  <div class="modal sm">
+    <div class="modal-head"><h2 data-i18n="renum_title">Renumerar saca</h2><button class="close" id="closeRenum">&times;</button></div>
+    <div class="modal-body pad">
+      <div class="field"><label data-i18n="renum_label">Novo número</label><input type="number" id="renumInput" min="1" step="1"></div>
+      <p class="hint" data-i18n="renum_hint">Use só se o número físico da saca estiver diferente do que o sistema atribuiu.</p>
+    </div>
+    <div class="modal-foot"><button class="btn ghost" id="cancelRenum" data-i18n="cancel">Cancelar</button><button class="btn loud" id="saveRenum" data-i18n="save">Salvar</button></div>
+  </div>
+</div>
+
 <!-- Settings / advanced / diagnostics modal -->
 <div class="overlay" id="settingsOverlay">
   <div class="modal">

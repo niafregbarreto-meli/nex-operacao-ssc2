@@ -523,6 +523,18 @@ table.data tbody tr:hover { background: var(--andes-blue-bg); }
   </div>
 </div>
 
+<!-- Renumber saca modal -->
+<div class="overlay" id="renumOverlay">
+  <div class="modal sm">
+    <div class="modal-head"><h2 data-i18n="renum_title">Renumerar saca</h2><button class="close" id="closeRenum">&times;</button></div>
+    <div class="modal-body pad">
+      <div class="field"><label data-i18n="renum_label">Novo número</label><input type="number" id="renumInput" min="1" step="1"></div>
+      <p class="hint" data-i18n="renum_hint">Use só se o número físico da saca estiver diferente do que o sistema atribuiu.</p>
+    </div>
+    <div class="modal-foot"><button class="btn ghost" id="cancelRenum" data-i18n="cancel">Cancelar</button><button class="btn loud" id="saveRenum" data-i18n="save">Salvar</button></div>
+  </div>
+</div>
+
 <!-- Settings / advanced / diagnostics modal -->
 <div class="overlay" id="settingsOverlay">
   <div class="modal">
@@ -2977,12 +2989,20 @@ var qrcode = function() {
       selection: [],
       qrByNum: {},             // num -> QR string to encode
       metaByNum: {},           // num -> { agencia, veiculo(limpo), rotasacapl }
+      renum: {},               // "GRUPO#idx" -> número forçado manualmente pelo operador
       cfgEtq: { w: 12, h: 5, p: 0.4 }
     };
   }
 
   var state = defaultState();
   var pending = null;
+  // Sessão salva no Grid (otimização/seleção/QR de uma vez anterior) — só é
+  // aplicada ao `state` de verdade quando o operador clica "Recuperar salvo".
+  // Abrir o app nunca deve carregar uma otimização sozinho.
+  var savedSession = null;
+  // Número de saca reservado pelo sistema oficial (bugava se reusado) — nunca
+  // é atribuído automaticamente, igual a uma exclusão permanente.
+  var RESERVED_NUMS = [150];
 
   // ---------------------------------------------------------------- i18n
   var I18N = {
@@ -3009,7 +3029,11 @@ var qrcode = function() {
       settings: 'Configurações', advanced: 'Avançado', diag: 'Diagnóstico', qr_base_url: 'URL da base de QR (CSV publicado)',
       test_conn: 'Testar / atualizar agora', no_diag: 'Nenhuma tentativa ainda.', close: 'Fechar', upload_opt: 'Subir otimização',
       clear_all: 'Limpar tudo (recomeçar)', clear_all_confirm: 'Isso apaga a otimização, seleção e QR salvos. Continuar?', cleared_ok: 'Tudo limpo!',
-      change_opt: 'Trocar'
+      change_opt: 'Trocar',
+      renum_title: 'Renumerar saca', renum_label: 'Novo número',
+      renum_hint: 'Use só se o número físico da saca estiver diferente do que o sistema atribuiu.',
+      renum_invalid: 'Número inválido.', renum_reserved: 'Esse número é reservado pelo sistema — não pode ser usado.',
+      renum_taken: 'Esse número já está em uso por outra saca.', renum_ok: 'Saca renumerada!'
     },
     es: {
       site: 'Sitio', avail_bags: 'Sacas disponibles ↗', optimization: 'Optimización',
@@ -3034,7 +3058,11 @@ var qrcode = function() {
       settings: 'Configuración', advanced: 'Avanzado', diag: 'Diagnóstico', qr_base_url: 'URL de la base de QR (CSV publicado)',
       test_conn: 'Probar / actualizar ahora', no_diag: 'Ninguna tentativa aún.', close: 'Cerrar', upload_opt: 'Subir optimización',
       clear_all: 'Limpiar todo (reiniciar)', clear_all_confirm: 'Esto borra la optimización, selección y QR guardados. ¿Continuar?', cleared_ok: '¡Todo limpio!',
-      change_opt: 'Cambiar'
+      change_opt: 'Cambiar',
+      renum_title: 'Renumerar saca', renum_label: 'Nuevo número',
+      renum_hint: 'Usá esto solo si el número físico de la saca es distinto del que el sistema asignó.',
+      renum_invalid: 'Número inválido.', renum_reserved: 'Ese número está reservado por el sistema — no se puede usar.',
+      renum_taken: 'Ese número ya está en uso por otra saca.', renum_ok: '¡Saca renumerada!'
     }
   };
   function t(k) { return (I18N[state.lang] && I18N[state.lang][k]) || I18N.pt[k] || k; }
@@ -3076,12 +3104,33 @@ var qrcode = function() {
   }
 
   // ---------------------------------------------------------------- persistence
-  function persist() { state.updatedAt = new Date().toISOString(); window.GridStore.saveDebounced(state, 400); }
+  // Enquanto o operador não subiu nem recuperou nada (state.groups vazio),
+  // não pisa a sessão salva no Grid — só atualiza preferências (idioma,
+  // site, URL da base, config de etiqueta). Assim, abrir o app e mudar o
+  // idioma antes de decidir não apaga o "Recuperar salvo" de ontem.
+  function persist() {
+    state.updatedAt = new Date().toISOString();
+    var toSave = state;
+    if (!state.groups.length && savedSession && savedSession.groups && savedSession.groups.length) {
+      toSave = Object.assign({}, savedSession, {
+        lang: state.lang, site: state.site, qrBaseUrl: state.qrBaseUrl, cfgEtq: state.cfgEtq, updatedAt: state.updatedAt
+      });
+    }
+    window.GridStore.saveDebounced(toSave, 400);
+  }
 
   async function init() {
     var loaded = await window.GridStore.load();
-    if (loaded && loaded.schemaVersion === SCHEMA_VERSION) state = loaded;
-    if (!state.cfgEtq) state.cfgEtq = { w: 12, h: 5, p: 0.4 };
+    if (loaded && loaded.schemaVersion === SCHEMA_VERSION) {
+      savedSession = loaded;
+      // Só preferências entram automaticamente — a otimização em si exige
+      // "Recuperar salvo" (ou um novo upload). Abrir o app nunca carrega
+      // sozinho a otimização de outro dia.
+      state.lang = loaded.lang || state.lang;
+      state.site = loaded.site || state.site;
+      state.qrBaseUrl = loaded.qrBaseUrl || state.qrBaseUrl;
+      state.cfgEtq = loaded.cfgEtq || state.cfgEtq;
+    }
     var badge = $('storageBadge');
     if (window.GridStore.isRunningInGrid()) { badge.textContent = 'Grid'; badge.classList.remove('local'); }
     else { badge.textContent = 'Local (preview)'; badge.classList.add('local'); }
@@ -3089,9 +3138,6 @@ var qrcode = function() {
     $('siteSelect').value = state.site;
     applyLang();
     render();
-    // Auto-sync desligado por ora (estava trazendo dados que não têm nada a
-    // ver com a otimização do dia). QR só é buscado quando o operador clica
-    // "Atualizar QR" ou "Testar/atualizar agora" em Configurações.
   }
 
   // ---------------------------------------------------------------- QR base auto-load
@@ -3239,17 +3285,16 @@ var qrcode = function() {
     }
   }
 
-  // Testa TODAS as abas candidatas (não para na primeira que responder) —
-  // uma aba pode existir e responder sem ter a coluna de QR (ex.:
-  // SEPARACAO_NEX). Só aceita de vez uma aba que realmente tenha
-  // CONTAINER_QR/CONTAINER_ID; senão guarda a primeira que respondeu como
-  // último recurso e continua procurando.
-  async function tryGridSheets() {
+  // Testa TODAS as abas candidatas e devolve TODAS as que responderam com
+  // linhas — não fica só com a primeira. QR e agência/modal costumam morar
+  // em abas diferentes (EX_ROTAS_QR só tem QR; SEPARACAO_NEX só tem
+  // agência/veículo), então precisa juntar as duas, não escolher uma.
+  async function tryGridSheetsAll() {
     if (!ensureGridSheetsReady()) {
       qrDiag.attempts.push({ via: 'Grid.sheets', ok: false, error: window.GridStore.isRunningInGrid() ? 'Grid.sheets indisponível' : 'fora do Grid' });
-      return null;
+      return [];
     }
-    var fallback = null;
+    var results = [];
     for (var i = 0; i < GRID_SHEET_TABS.length; i++) {
       var tab = GRID_SHEET_TABS[i];
       var attempt = { via: 'Grid.sheets', tab: tab, ok: false };
@@ -3261,10 +3306,7 @@ var qrcode = function() {
         if (parsed && parsed.rows.length) {
           attempt.ok = true; attempt.columns = parsed.headers; attempt.rowCount = parsed.rows.length; attempt.sample = parsed.rows.slice(0, 2);
           qrDiag.attempts.push(attempt);
-          var hasQrCol = col(parsed.headers, ['CONTAINER_QR', 'CÓDIGO QR', 'CODIGO QR', 'CODIGO', 'QR']) !== -1 ||
-            col(parsed.headers, ['CONTAINER_ID']) !== -1;
-          if (hasQrCol) return parsed;
-          if (!fallback) fallback = parsed;
+          results.push(parsed);
           continue;
         }
         attempt.error = 'vazio'; qrDiag.attempts.push(attempt);
@@ -3273,24 +3315,26 @@ var qrcode = function() {
         qrDiag.attempts.push(attempt);
       }
     }
-    return fallback;
+    return results;
   }
 
   async function loadQrBase(silent) {
     qrDiag = { attempts: [], at: new Date().toLocaleString(state.lang === 'pt' ? 'pt-BR' : 'es-AR') };
     setSyncStatus(t('sync_syncing'));
-    var parsed = await tryFetchPublishedCsv();
-    if (!parsed) parsed = await tryGridSheets();
-    if (!parsed) {
+    var totalQr = 0, gotAny = false;
+    var parsedFetch = await tryFetchPublishedCsv();
+    if (parsedFetch) { totalQr += applyQrBase(parsedFetch).qrCount; gotAny = true; }
+    var allTabs = await tryGridSheetsAll();
+    allTabs.forEach(function (parsed) { totalQr += applyQrBase(parsed).qrCount; gotAny = true; });
+    if (!gotAny) {
       setSyncStatus(t('sync_fail_all'), silent ? null : 'err');
       renderDiag();
       return false;
     }
-    var info = applyQrBase(parsed);
     state.lastSheetSync = new Date().toLocaleTimeString(state.lang === 'pt' ? 'pt-BR' : 'es-AR');
     persist(); render(); renderDiag();
-    if (info.qrCount === 0) { setSyncStatus(t('sync_no_qr_cols'), 'err'); return false; }
-    setSyncStatus(t('sync_ok') + state.lastSheetSync + ' · ' + info.qrCount + ' QR', 'ok');
+    if (totalQr === 0) { setSyncStatus(t('sync_no_qr_cols'), 'err'); return false; }
+    setSyncStatus(t('sync_ok') + state.lastSheetSync + ' · ' + totalQr + ' QR', 'ok');
     return true;
   }
   // alias antigo
@@ -3367,17 +3411,32 @@ var qrcode = function() {
     // Nova otimização = numeração global do zero: exclusões/seleção da rodada
     // anterior não têm mais sentido (o mesmo número agora é outra saca).
     state.source = 'opt'; state.groups = groups; state.optFileName = pending.fileName;
-    state.selection = []; state.excluded = [];
+    state.selection = []; state.excluded = []; state.renum = {};
+    savedSession = null; // essa otimização nova substitui qualquer "salvo" antigo
     pending = null; persist(); render();
     toast(groups.length + (state.lang === 'pt' ? ' rotas carregadas' : ' rutas cargadas'), true);
-    // QR fica pendente até o operador clicar "Atualizar QR" (auto-sync desligado por ora).
+    loadQrBase(true);
   }
 
+  // Numeração global sequencial, com "buracos" nas sacas excluídas/reservadas.
+  // Roda de novo em todo render (fonte = otimização), então uma renumeração
+  // manual não pode só mudar o array — tem que ficar em state.renum
+  // ("GRUPO#posição" -> número forçado) pra sobreviver ao recálculo.
   function assignRunningNumbers(groups) {
     var skip = excludedSet(), n = 1;
+    RESERVED_NUMS.forEach(function (r) { skip.add(r); });
+    Object.keys(state.renum || {}).forEach(function (k) { skip.add(parseInt(state.renum[k], 10)); });
     groups.forEach(function (g) {
-      var arr = [], got = 0;
-      while (got < g.count) { if (!skip.has(n)) { arr.push(n); got++; } n++; }
+      var arr = [], got = 0, idx = 0;
+      while (got < g.count) {
+        if (!skip.has(n)) {
+          var key = g.name + '#' + idx;
+          var override = state.renum && state.renum[key] != null ? parseInt(state.renum[key], 10) : null;
+          arr.push(override != null ? override : n);
+          got++; idx++;
+        }
+        n++;
+      }
       g.realSacas = arr;
     });
   }
@@ -3479,15 +3538,23 @@ var qrcode = function() {
   // salvo que ficou errado (ex.: rotas antigas construídas por engano pelo
   // auto-sync). Mantém idioma/site.
   function clearAll() {
-    state.source = null; state.groups = []; state.selection = []; state.excluded = [];
+    state.source = null; state.groups = []; state.selection = []; state.excluded = []; state.renum = {};
     state.optFileName = null; state.qrByNum = {}; state.metaByNum = {}; state.lastSave = null; state.lastSheetSync = null;
+    savedSession = null;
     persist(); render();
     $('settingsOverlay').classList.remove('open');
     toast(t('cleared_ok'), true);
   }
+  // Aplica de verdade a sessão salva no Grid (otimização + seleção + QR de
+  // uma vez anterior) — é a ÚNICA forma de trazer de volta uma otimização
+  // já subida; abrir o app nunca faz isso sozinho.
   function restoreSaved() {
-    if (!state.groups.length) { toast(t('no_saved'), false); return; }
-    render(); toast(t('restored'), true);
+    if (!savedSession || !savedSession.groups || !savedSession.groups.length) { toast(t('no_saved'), false); return; }
+    state = savedSession;
+    savedSession = null;
+    persist(); render();
+    toast(t('restored'), true);
+    loadQrBase(true);
   }
 
   // ---------------------------------------------------------------- rendering
@@ -3540,9 +3607,10 @@ var qrcode = function() {
         '<button class="btn ghost sm selGroup" data-g="' + esc(group.name) + '">' + t('sel_group') + '</button>' +
         '</div>';
       var grid = '<div class="saca-grid">';
-      nums.forEach(function (num) {
+      nums.forEach(function (num, idx) {
         var isSel = sel.has(num);
-        grid += '<button class="saca' + (isSel ? ' selected' : '') + '" data-num="' + num + '">' + num +
+        grid += '<button class="saca' + (isSel ? ' selected' : '') + '" data-num="' + num + '" data-idx="' + idx + '" title="' +
+          (state.lang === 'pt' ? 'Duplo clique pra renumerar' : 'Doble clic para renumerar') + '">' + num +
           '<span class="dot' + (hasQr(num) ? ' has' : '') + '" title="' + (hasQr(num) ? 'QR' : 'sem QR') + '"></span>' +
           '<span class="rm" data-rm="' + num + '">&times;</span></button>';
       });
@@ -3552,10 +3620,16 @@ var qrcode = function() {
 
     wrap.querySelectorAll('.saca').forEach(function (btn) {
       var num = parseInt(btn.getAttribute('data-num'), 10);
+      var idx = parseInt(btn.getAttribute('data-idx'), 10);
+      var groupName = btn.closest('.route-card').querySelector('.name').textContent;
       btn.addEventListener('click', function (e) {
         if (e.target.getAttribute('data-rm')) return;
         var s = selectionSet(); if (s.has(num)) s.delete(num); else s.add(num);
         state.selection = Array.from(s); persist(); renderRoutes(); updatePrintBar();
+      });
+      btn.addEventListener('dblclick', function (e) {
+        e.preventDefault(); e.stopPropagation();
+        openRenum(groupName, idx, num);
       });
     });
     wrap.querySelectorAll('.rm').forEach(function (x) {
@@ -3618,12 +3692,16 @@ var qrcode = function() {
     var qr = window.qrcode(0, 'M'); qr.addData(txt); qr.make();
     return qr.createSvgTag({ cellSize: 3, margin: 1, scalable: true });
   }
+  // Rotas do ciclo CHP (ex.: "X1_CHP") nunca levam carro/agência impressos —
+  // fica em branco de propósito. Isso só aparece dentro do ciclo AM.
+  function isChpRoute(g) { return /CHP/i.test(g.fullName || g.name || ''); }
   function selectedItems() {
     var numToGroup = {}; state.groups.forEach(function (g) { (g.realSacas || []).forEach(function (n) { numToGroup[n] = g; }); });
     return state.selection.slice().sort(function (a, b) { return a - b; }).map(function (num) {
       var g = numToGroup[num]; if (!g) return null;
       var m = state.metaByNum[num] || {};
-      return { num: num, route: g.name, agencia: m.agencia || '', modal: m.veiculo || '', qr: state.qrByNum[num] || '' };
+      var chp = isChpRoute(g);
+      return { num: num, route: g.name, agencia: chp ? '' : (m.agencia || ''), modal: chp ? '' : (m.veiculo || ''), qr: state.qrByNum[num] || '', chp: chp };
     }).filter(Boolean);
   }
 
@@ -3645,8 +3723,8 @@ var qrcode = function() {
         ch.forEach(function (it) {
           html += '<div class="card-et"><div class="c-num"><h1>' + esc(it.num) + '</h1></div>' +
             '<div class="c-route"><h2>' + esc(it.route) + '</h2></div>' +
-            '<div class="c-field"><span>' + esc(it.agencia || '—') + '</span></div>' +
-            '<div class="c-field"><span>' + esc(it.modal || '—') + '</span></div>' +
+            '<div class="c-field"><span>' + esc(it.chp ? '' : (it.agencia || '—')) + '</span></div>' +
+            '<div class="c-field"><span>' + esc(it.chp ? '' : (it.modal || '—')) + '</span></div>' +
             '<div class="c-qr">' + makeQrSvg(it.qr) + '</div></div>';
         });
         for (var j = ch.length; j < 4; j++) html += '<div class="card-et empty"></div>';
@@ -3660,9 +3738,9 @@ var qrcode = function() {
             '<div class="fcell qN">' + qr + '</div>' +
             '<div class="fcell num"><span class="rot f-num">' + esc(it.num) + '</span></div>' +
             '<div class="fcell qS">' + qr + '</div>' +
-            '<div class="fcell ag"><span class="rot f-info">' + esc(it.agencia || '—') + '</span></div>' +
+            '<div class="fcell ag"><span class="rot f-info">' + esc(it.chp ? '' : (it.agencia || '—')) + '</span></div>' +
             '<div class="fcell rt f-gray"><span class="rot f-route">' + esc(it.route) + '</span></div>' +
-            '<div class="fcell md"><span class="rot f-info">' + esc(it.modal || '—') + '</span></div>' +
+            '<div class="fcell md"><span class="rot f-info">' + esc(it.chp ? '' : (it.modal || '—')) + '</span></div>' +
             '</div></div>';
         }
         html += '<div class="folha-page">' + half('oeste') + half('leste') + '</div>';
@@ -3677,8 +3755,8 @@ var qrcode = function() {
         html += '<div class="etq"><div class="qr">' + makeQrSvg(it.qr) + '</div><div class="lines">' +
           '<div class="ln"><span class="k">SACA:</span>' + esc(it.num) + '</div>' +
           '<div class="ln"><span class="k">ROTA:</span>' + esc(it.route) + '</div>' +
-          '<div class="ln"><span class="k">AGÊNCIA:</span>' + esc(it.agencia || '—') + '</div>' +
-          '<div class="ln"><span class="k">MODAL:</span>' + esc(it.modal || '—') + '</div>' +
+          '<div class="ln"><span class="k">AGÊNCIA:</span>' + esc(it.chp ? '' : (it.agencia || '—')) + '</div>' +
+          '<div class="ln"><span class="k">MODAL:</span>' + esc(it.chp ? '' : (it.modal || '—')) + '</div>' +
           '</div></div>';
       });
     }
@@ -3695,6 +3773,52 @@ var qrcode = function() {
   function saveCfg() {
     state.cfgEtq = { w: parseFloat($('cfgW').value) || 12, h: parseFloat($('cfgH').value) || 5, p: parseFloat($('cfgP').value) || 0.4 };
     persist(); $('cfgOverlay').classList.remove('open'); toast(t('saved_ok'), true);
+  }
+
+  // ---------------------------------------------------------------- renumerar saca
+  // Guarda o override em state.renum ("GRUPO#idx" -> número), porque
+  // assignRunningNumbers recalcula os números do zero em todo render (fonte
+  // = otimização) — só mudar o array direto seria apagado no próximo render.
+  var renumTarget = null; // { groupName, idx, oldNum }
+  function openRenum(groupName, idx, oldNum) {
+    renumTarget = { groupName: groupName, idx: idx, oldNum: oldNum };
+    $('renumInput').value = oldNum;
+    $('renumOverlay').classList.add('open');
+    $('renumInput').focus();
+  }
+  function saveRenum() {
+    if (!renumTarget) return;
+    var newNum = parseInt($('renumInput').value, 10);
+    if (isNaN(newNum) || newNum <= 0) { toast(t('renum_invalid'), false); return; }
+    if (newNum === renumTarget.oldNum) { $('renumOverlay').classList.remove('open'); return; }
+    if (RESERVED_NUMS.indexOf(newNum) !== -1) { toast(t('renum_reserved'), false); return; }
+    var taken = false;
+    state.groups.forEach(function (g) { if ((g.realSacas || []).indexOf(newNum) !== -1) taken = true; });
+    if (taken) { toast(t('renum_taken'), false); return; }
+
+    var g = state.groups.filter(function (x) { return x.name === renumTarget.groupName; })[0];
+    if (!g) return;
+    var idx = g.realSacas.indexOf(renumTarget.oldNum);
+    if (idx === -1) return;
+    g.realSacas[idx] = newNum;
+    g.realSacas.sort(function (a, b) { return a - b; });
+    if (!state.renum) state.renum = {};
+    state.renum[renumTarget.groupName + '#' + renumTarget.idx] = newNum;
+
+    var s = selectionSet();
+    if (s.has(renumTarget.oldNum)) { s.delete(renumTarget.oldNum); s.add(newNum); state.selection = Array.from(s); }
+    var ex = excludedSet();
+    if (ex.has(renumTarget.oldNum)) { ex.delete(renumTarget.oldNum); ex.add(newNum); state.excluded = Array.from(ex); }
+    // QR/agência/modal são amarrados ao NÚMERO na base — ao renumerar, o
+    // dado antigo não vale mais pra essa saca; busca de novo pro número novo.
+    delete state.qrByNum[renumTarget.oldNum];
+    delete state.metaByNum[renumTarget.oldNum];
+
+    renumTarget = null;
+    persist(); render();
+    $('renumOverlay').classList.remove('open');
+    toast(t('renum_ok'), true);
+    loadQrBase(true);
   }
 
   // ---------------------------------------------------------------- settings + diagnostics
@@ -3747,6 +3871,11 @@ var qrcode = function() {
     $('closeCfg').addEventListener('click', function () { $('cfgOverlay').classList.remove('open'); });
     $('cancelCfg').addEventListener('click', function () { $('cfgOverlay').classList.remove('open'); });
     $('saveCfg').addEventListener('click', saveCfg);
+
+    $('closeRenum').addEventListener('click', function () { $('renumOverlay').classList.remove('open'); });
+    $('cancelRenum').addEventListener('click', function () { $('renumOverlay').classList.remove('open'); });
+    $('saveRenum').addEventListener('click', saveRenum);
+    $('renumOverlay').addEventListener('click', function (e) { if (e.target === this) this.classList.remove('open'); });
 
     // Configurações / avançado
     $('btnSettings').addEventListener('click', openSettings);
