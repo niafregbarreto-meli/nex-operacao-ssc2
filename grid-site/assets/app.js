@@ -63,7 +63,8 @@
       sync_fail_all: 'Não consegui trazer o QR automaticamente. Veja Configurações ⚙ → Diagnóstico.',
       sync_no_qr_cols: 'Base lida, mas sem coluna de QR (CONTAINER_QR/CONTAINER_ID). Veja ⚙ → Diagnóstico.',
       settings: 'Configurações', advanced: 'Avançado', diag: 'Diagnóstico', qr_base_url: 'URL da base de QR (CSV publicado)',
-      test_conn: 'Testar / atualizar agora', no_diag: 'Nenhuma tentativa ainda.', close: 'Fechar', upload_opt: 'Subir otimização'
+      test_conn: 'Testar / atualizar agora', no_diag: 'Nenhuma tentativa ainda.', close: 'Fechar', upload_opt: 'Subir otimização',
+      clear_all: 'Limpar tudo (recomeçar)', clear_all_confirm: 'Isso apaga a otimização, seleção e QR salvos. Continuar?', cleared_ok: 'Tudo limpo!'
     },
     es: {
       site: 'Sitio', avail_bags: 'Sacas disponibles ↗', optimization: 'Optimización',
@@ -86,7 +87,8 @@
       sync_fail_all: 'No pude traer el QR automáticamente. Mirá Configuración ⚙ → Diagnóstico.',
       sync_no_qr_cols: 'Base leída, pero sin columna de QR (CONTAINER_QR/CONTAINER_ID). Mirá ⚙ → Diagnóstico.',
       settings: 'Configuración', advanced: 'Avanzado', diag: 'Diagnóstico', qr_base_url: 'URL de la base de QR (CSV publicado)',
-      test_conn: 'Probar / actualizar ahora', no_diag: 'Ninguna tentativa aún.', close: 'Cerrar', upload_opt: 'Subir optimización'
+      test_conn: 'Probar / actualizar ahora', no_diag: 'Ninguna tentativa aún.', close: 'Cerrar', upload_opt: 'Subir optimización',
+      clear_all: 'Limpiar todo (reiniciar)', clear_all_confirm: 'Esto borra la optimización, selección y QR guardados. ¿Continuar?', cleared_ok: '¡Todo limpio!'
     }
   };
   function t(k) { return (I18N[state.lang] && I18N[state.lang][k]) || I18N.pt[k] || k; }
@@ -141,7 +143,9 @@
     $('siteSelect').value = state.site;
     applyLang();
     render();
-    syncFromSheet(true); // silencioso: não pisa a tela com erro num primeiro load
+    // Auto-sync desligado por ora (estava trazendo dados que não têm nada a
+    // ver com a otimização do dia). QR só é buscado quando o operador clica
+    // "Atualizar QR" ou "Testar/atualizar agora" em Configurações.
   }
 
   // ---------------------------------------------------------------- QR base auto-load
@@ -397,7 +401,7 @@
     state.selection = []; state.excluded = [];
     pending = null; persist(); render();
     toast(groups.length + (state.lang === 'pt' ? ' rotas carregadas' : ' rutas cargadas'), true);
-    loadQrBase(true); // traz o QR automaticamente logo após a otimização
+    // QR fica pendente até o operador clicar "Atualizar QR" (auto-sync desligado por ora).
   }
 
   function assignRunningNumbers(groups) {
@@ -501,6 +505,16 @@
   function clearOptimization() {
     state.source = null; state.groups = []; state.selection = []; state.excluded = []; state.optFileName = null;
     persist(); render();
+  }
+  // Apaga tudo (otimização, seleção, QR, exclusões) — pra sair de um estado
+  // salvo que ficou errado (ex.: rotas antigas construídas por engano pelo
+  // auto-sync). Mantém idioma/site.
+  function clearAll() {
+    state.source = null; state.groups = []; state.selection = []; state.excluded = [];
+    state.optFileName = null; state.qrByNum = {}; state.metaByNum = {}; state.lastSave = null; state.lastSheetSync = null;
+    persist(); render();
+    $('settingsOverlay').classList.remove('open');
+    toast(t('cleared_ok'), true);
   }
   function restoreSaved() {
     if (!state.groups.length) { toast(t('no_saved'), false); return; }
@@ -775,6 +789,7 @@
     $('btnExtracao').addEventListener('click', function () { chooseFile('extr'); });
     $('btnQrFallback').addEventListener('click', function () { chooseFile('qrfb'); });
     $('btnVerExtracao').addEventListener('click', openExtracao);
+    $('btnClearAll').addEventListener('click', clearAll);
     $('closeExtracao').addEventListener('click', function () { $('extracaoOverlay').classList.remove('open'); });
     $('extracaoOverlay').addEventListener('click', function (e) { if (e.target === this) this.classList.remove('open'); });
 
