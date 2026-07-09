@@ -205,15 +205,15 @@
     return null;
   }
 
-  // Aplica a base ao estado. Preenche qrByNum/metaByNum por número de saca.
-  // Se ainda não há rotas (otimização não subida) E a base traz rota (ROTAOT com
-  // letra), constrói os grupos a partir dela. Caso contrário, só preenche QR/meta
-  // — nunca reseta seleção/exclusão do operador.
+  // Aplica a base ao estado. Preenche SÓ qrByNum/metaByNum das sacas que já
+  // existem (numeração vem sempre da otimização, subida manual). A base
+  // nunca cria rota nem saca — se ainda não há otimização subida, esta
+  // função não tem nada para preencher e a tela vazia continua visível.
+  // Nunca reseta seleção/exclusão do operador.
   function applyQrBase(parsed) {
     var h = parsed.headers;
     var iNum = col(h, ['ROTASACA', 'SACA', 'NUMERO_NEX']);
     var iOt = col(h, ['ROTAOT', 'ID OTIMIZADO', 'ROTA']);
-    var iPl = col(h, ['ROTAPL', 'ID PLANEJADO']);
     var iQr = col(h, ['CONTAINER_QR', 'CÓDIGO QR', 'CODIGO QR', 'CODIGO', 'QR']);
     var iCid = col(h, ['CONTAINER_ID']);
     var iCode = col(h, ['ROTASACAPL']);
@@ -226,11 +226,6 @@
       if (iOt !== -1 && /^\d+$/.test(String(r[iOt] || '').trim())) return parseInt(r[iOt], 10);
       return null;
     }
-    function routeOf(r) {
-      var v = iOt !== -1 ? String(r[iOt] || '').trim().toUpperCase() : '';
-      if (v && /[A-Z]/.test(v)) return prefixOf(v);
-      return null;
-    }
     function qrOf(r, numRaw) {
       var q = iQr !== -1 ? String(r[iQr] || '').trim() : '';
       if (!q && iCid !== -1 && String(r[iCid] || '').trim()) {
@@ -240,42 +235,22 @@
       return q;
     }
 
-    var haveRoutes = state.groups.length > 0;
     var qrCount = 0;
+    var knownNums = {};
+    state.groups.forEach(function (g) { (g.realSacas || []).forEach(function (n) { knownNums[n] = true; }); });
 
-    if (!haveRoutes) {
-      // construir grupos a partir da base (só se ela tiver rota com letra)
-      var byGroup = {}, order = [];
-      parsed.rows.forEach(function (r) {
-        var num = sacaNumOf(r); if (num == null) return;
-        var route = routeOf(r); if (!route) return;
-        if (!byGroup[route]) { byGroup[route] = { name: route,
-          fullName: iOt !== -1 ? String(r[iOt] || '').trim().toUpperCase() : route,
-          planned: iPl !== -1 ? String(r[iPl] || '').trim().toUpperCase() : '', nums: [] }; order.push(route); }
-        byGroup[route].nums.push(num);
-        var q = qrOf(r, num); if (q) { state.qrByNum[num] = q; qrCount++; }
-        state.metaByNum[num] = { agencia: iAg !== -1 ? String(r[iAg] || '').trim() : '',
-          veiculo: iVe !== -1 ? limparVeiculo(r[iVe]) : '', rotasacapl: iCode !== -1 ? String(r[iCode] || '').trim() : '' };
-      });
-      if (order.length) {
-        state.source = 'extr';
-        state.groups = order.map(function (name) { var g = byGroup[name]; g.nums.sort(function (a, b) { return a - b; });
-          return { name: g.name, fullName: g.fullName, planned: g.planned, hybrid: true, count: g.nums.length, realSacas: g.nums }; });
+    parsed.rows.forEach(function (r) {
+      var num = sacaNumOf(r); if (num == null) return;
+      if (!knownNums[num]) return; // base nunca cria saca — só completa as que a otimização já criou
+      var q = qrOf(r, num); if (q) { state.qrByNum[num] = q; qrCount++; }
+      var ag = iAg !== -1 ? String(r[iAg] || '').trim() : '';
+      var ve = iVe !== -1 ? limparVeiculo(r[iVe]) : '';
+      var code = iCode !== -1 ? String(r[iCode] || '').trim() : '';
+      if (ag || ve || code) {
+        var prev = state.metaByNum[num] || {};
+        state.metaByNum[num] = { agencia: ag || prev.agencia || '', veiculo: ve || prev.veiculo || '', rotasacapl: code || prev.rotasacapl || '' };
       }
-    } else {
-      // só preenche QR/meta nas sacas que já existem
-      parsed.rows.forEach(function (r) {
-        var num = sacaNumOf(r); if (num == null) return;
-        var q = qrOf(r, num); if (q) { state.qrByNum[num] = q; qrCount++; }
-        var ag = iAg !== -1 ? String(r[iAg] || '').trim() : '';
-        var ve = iVe !== -1 ? limparVeiculo(r[iVe]) : '';
-        var code = iCode !== -1 ? String(r[iCode] || '').trim() : '';
-        if (ag || ve || code) {
-          var prev = state.metaByNum[num] || {};
-          state.metaByNum[num] = { agencia: ag || prev.agencia || '', veiculo: ve || prev.veiculo || '', rotasacapl: code || prev.rotasacapl || '' };
-        }
-      });
-    }
+    });
     return { qrCount: qrCount, rowCount: parsed.rows.length, headers: h };
   }
 
