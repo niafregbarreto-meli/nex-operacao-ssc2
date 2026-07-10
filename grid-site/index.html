@@ -143,6 +143,15 @@
         <span id="storageBadge" class="storage-badge">—</span>
       </div>
 
+      <h3 style="font-size:12px; text-transform:uppercase; letter-spacing:.5px; color:var(--text-2); margin:18px 0 6px" data-i18n="log_title">Registro de impressão (opcional)</h3>
+      <div class="field">
+        <label data-i18n="log_url">URL do Verdi Flow que grava a planilha</label>
+        <input type="text" id="setLogUrl" spellcheck="false" placeholder="https://verdi-flows.melisystems.com/webhook/...">
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px">
+        <button class="btn quiet sm" id="btnTestLog" data-i18n="test_log">Testar registro</button>
+      </div>
+
       <h3 style="font-size:12px; text-transform:uppercase; letter-spacing:.5px; color:var(--text-2); margin:8px 0 6px" data-i18n="diag">Diagnóstico</h3>
       <div id="diagBox" class="diag-box"></div>
 

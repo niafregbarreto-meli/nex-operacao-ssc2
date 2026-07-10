@@ -35,6 +35,7 @@
       metaByNum: {},           // num -> { agencia, veiculo(limpo), rotasacapl }
       renum: {},               // "GRUPO#idx" -> número forçado manualmente pelo operador
       fisicas: {},             // número da saca -> quantidade de sacas físicas (default 1)
+      logWebhookUrl: '',       // Verdi Flow que grava o registro de impressão na planilha (opcional)
       cfgEtq: { w: 12, h: 5, p: 0.4 }
     };
   }
@@ -80,7 +81,9 @@
       renum_invalid: 'Número inválido.', renum_reserved: 'Esse número é reservado pelo sistema — não pode ser usado.',
       renum_taken: 'Esse número já está em uso por outra saca.', renum_ok: 'Saca atualizada!',
       fisicas_label: 'Quantidade de sacas físicas',
-      fisicas_hint: 'Se essa saca do sistema corresponde a mais de uma saca física, a impressão gera uma etiqueta por saca física (1-A, 1-B…), todas com o mesmo QR.'
+      fisicas_hint: 'Se essa saca do sistema corresponde a mais de uma saca física, a impressão gera uma etiqueta por saca física (1-A, 1-B…), todas com o mesmo QR.',
+      log_title: 'Registro de impressão (opcional)', log_url: 'URL do Verdi Flow que grava a planilha',
+      test_log: 'Testar registro', log_ok: 'Registro funcionando!', log_fail: 'Registro falhou:'
     },
     es: {
       site: 'Sitio', avail_bags: 'Sacas disponibles ↗', optimization: 'Optimización',
@@ -111,7 +114,9 @@
       renum_invalid: 'Número inválido.', renum_reserved: 'Ese número está reservado por el sistema — no se puede usar.',
       renum_taken: 'Ese número ya está en uso por otra saca.', renum_ok: '¡Saca actualizada!',
       fisicas_label: 'Cantidad de sacas físicas',
-      fisicas_hint: 'Si esta saca del sistema corresponde a más de una saca física, la impresión genera una etiqueta por saca física (1-A, 1-B…), todas con el mismo QR.'
+      fisicas_hint: 'Si esta saca del sistema corresponde a más de una saca física, la impresión genera una etiqueta por saca física (1-A, 1-B…), todas con el mismo QR.',
+      log_title: 'Registro de impresión (opcional)', log_url: 'URL del Verdi Flow que graba la planilla',
+      test_log: 'Probar registro', log_ok: '¡Registro funcionando!', log_fail: 'Registro falló:'
     }
   };
   function t(k) { return (I18N[state.lang] && I18N[state.lang][k]) || I18N.pt[k] || k; }
@@ -843,6 +848,37 @@
 
     area.innerHTML = html;
     setTimeout(function () { window.print(); setTimeout(function () { area.innerHTML = ''; dynStyle(''); }, 800); }, 350);
+    logPrint(items);
+  }
+
+  // Manda um registro do que foi impresso pro Verdi Flow (opcional, configurado
+  // em ⚙). Nunca trava nem avisa erro pro operador — é só um log em segundo
+  // plano; se falhar (ex.: CSP bloqueando o domínio), fica só no console.
+  var lastLogError = '';
+  function logPrint(items) {
+    var url = state.logWebhookUrl && state.logWebhookUrl.trim();
+    if (!url) return;
+    var now = new Date().toISOString();
+    var payload = { items: items.map(function (it) {
+      return { timestamp: now, saca: it.num, serial: it.serial, rota: it.route,
+        agencia: it.chp ? '' : it.agencia, qtd_fisicas: (state.fisicas && state.fisicas[it.num]) || 1 };
+    }) };
+    fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      .then(function (res) { if (!res.ok) throw new Error('HTTP ' + res.status); lastLogError = ''; })
+      .catch(function (err) { lastLogError = describeError(err); });
+  }
+  async function testLogWebhook() {
+    var url = $('setLogUrl').value.trim();
+    state.logWebhookUrl = url; persist();
+    if (!url) { toast(t('saved_ok'), true); return; }
+    try {
+      var res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: [{ timestamp: new Date().toISOString(), saca: 0, serial: 'TESTE', rota: 'TESTE', agencia: '', qtd_fisicas: 1 }] }) });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      toast(t('log_ok'), true);
+    } catch (err) {
+      toast(t('log_fail') + ' ' + describeError(err), false);
+    }
   }
 
   // ---------------------------------------------------------------- config etiqueta
@@ -920,6 +956,7 @@
   // ---------------------------------------------------------------- settings + diagnostics
   function openSettings() {
     $('setQrUrl').value = state.qrBaseUrl || DEFAULT_QR_BASE_URL;
+    $('setLogUrl').value = state.logWebhookUrl || '';
     renderDiag();
     $('settingsOverlay').classList.add('open');
   }
@@ -939,6 +976,7 @@
   function saveSettings() {
     var url = $('setQrUrl').value.trim();
     state.qrBaseUrl = url || DEFAULT_QR_BASE_URL;
+    state.logWebhookUrl = $('setLogUrl').value.trim();
     persist();
     toast(t('saved_ok'), true);
   }
@@ -981,6 +1019,7 @@
     $('settingsOverlay').addEventListener('click', function (e) { if (e.target === this) this.classList.remove('open'); });
     $('saveSettings').addEventListener('click', saveSettings);
     $('btnTestConn').addEventListener('click', function () { saveSettings(); loadQrBase(false); });
+    $('btnTestLog').addEventListener('click', testLogWebhook);
     $('btnExtracao').addEventListener('click', function () { chooseFile('extr'); });
     $('btnQrFallback').addEventListener('click', function () { chooseFile('qrfb'); });
     $('btnVerExtracao').addEventListener('click', openExtracao);
