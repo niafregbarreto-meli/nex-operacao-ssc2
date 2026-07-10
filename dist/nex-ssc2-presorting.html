@@ -379,11 +379,9 @@ table.data tbody tr:hover { background: var(--andes-blue-bg); }
   /* ===== CARTÃO 4x1: rota filha / rota mãe(cinza) / agência / saca física / QR ===== */
   .print-grid { display: grid; grid-template-columns: 90mm 90mm; grid-template-rows: 130mm 130mm; gap: 10mm; }
   .card-wrap { width: 90mm; height: 130mm; display: flex; flex-direction: column; }
-  .card-et { width: 90mm; height: 122mm; display: flex; flex-direction: column; overflow: hidden;
+  .card-et { width: 90mm; height: 130mm; display: flex; flex-direction: column; overflow: hidden;
     border: 3px solid #000; border-radius: 10px; background: #fff; }
-  .card-et.empty { border: none; height: 130mm; }
-  .card-footer { height: 8mm; display: flex; align-items: center; justify-content: center;
-    font: 9pt 'Courier New', monospace; }
+  .card-et.empty { border: none; }
   .c-num { height: 38mm; display: flex; align-items: center; justify-content: center; border-bottom: 2px solid #000; }
   .c-num h1 { font: 900 80pt 'Arial Black', Arial, sans-serif; margin: 0; line-height: .8; }
   .c-route { height: 18mm; display: flex; align-items: center; justify-content: center; border-bottom: 2px solid #000;
@@ -400,8 +398,6 @@ table.data tbody tr:hover { background: var(--andes-blue-bg); }
   .folha-wrap { width: 210mm; height: 297mm; display: flex; flex-direction: column; page-break-after: always; }
   .folha-wrap:last-child { page-break-after: auto; }
   .folha-page { flex: 1; display: flex; overflow: hidden; }
-  .folha-footer { height: 8mm; flex: none; display: flex; align-items: center; justify-content: center;
-    font: 9pt 'Courier New', monospace; }
   .quad { width: 105mm; padding: 5mm; box-sizing: border-box; display: flex; }
   .quad.oeste { border-right: 1px dashed #999; }
   .fbox { flex: 1; border: 3px solid #000; border-radius: 14px; display: grid;
@@ -438,24 +434,20 @@ table.data tbody tr:hover { background: var(--andes-blue-bg); }
   }
   .etq2 .row { display: flex; align-items: stretch; border-bottom: 2px solid #000; overflow: hidden; }
   .etq2 .row:last-child { border-bottom: none; }
-  .etq2 .lbl {
-    width: 36%; flex: none; display: flex; align-items: center; padding-left: 2mm; padding-right: 1mm;
-    font: 700 7.5pt Arial, sans-serif; text-transform: uppercase; border-right: 2px solid #000; line-height: 1.05;
-  }
-  .etq2 .val { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; gap: 3mm; padding: 0 2mm; }
+  .etq2 .val { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden;
+    gap: calc(3mm * var(--escale, 1)); padding: 0 2mm; }
   .etq2 .row.filha { flex: 1.4; }
   .etq2 .row.qrrow { flex: 3; }
   .etq2 .row.mae { flex: .9; }
   .etq2 .row.ag { flex: .9; }
   .etq2 .row.saca { flex: 1.2; }
   .etq2 .row.mae .val { background: #000 !important; }
-  .etq2 .val h1 { margin: 0; font: 900 52pt 'Arial Black', Arial, sans-serif; line-height: .85; }
-  .etq2 .val h2 { margin: 0; font: 900 20pt 'Arial Black', Arial, sans-serif; text-transform: uppercase; }
+  .etq2 .val h1 { margin: 0; font: 900 calc(52pt * var(--escale, 1)) 'Arial Black', Arial, sans-serif; line-height: .85; }
+  .etq2 .val h2 { margin: 0; font: 900 calc(20pt * var(--escale, 1)) 'Arial Black', Arial, sans-serif; text-transform: uppercase; }
   .etq2 .row.mae .val h2 { color: #fff; }
-  .etq2 .qr-big svg { width: 32mm; height: 32mm; }
-  .etq2 .ntotal { font: 900 15pt 'Arial Black', Arial, sans-serif; white-space: nowrap; }
-  .etq2 .qr-mini svg { width: 12mm; height: 12mm; }
-  .etq2-footer { margin-top: 2mm; font: 10pt 'Courier New', monospace; }
+  .etq2 .qr-big svg { width: calc(32mm * var(--escale, 1)); height: calc(32mm * var(--escale, 1)); }
+  .etq2 .ntotal { font: 900 calc(15pt * var(--escale, 1)) 'Arial Black', Arial, sans-serif; white-space: nowrap; }
+  .etq2 .qr-mini svg { width: calc(12mm * var(--escale, 1)); height: calc(12mm * var(--escale, 1)); }
 }
 
 </style>
@@ -3096,8 +3088,7 @@ var qrcode = function() {
       fisicas_hint: 'Se essa saca do sistema corresponde a mais de uma saca física, a etiqueta mostra "N DE total" pra cada uma, com o serial da data já embutido.',
       log_title: 'Registro de impressão (opcional)', log_url: 'URL do Verdi Flow que grava a planilha',
       test_log: 'Testar registro', log_ok: 'Registro funcionando!', log_fail: 'Registro falhou:',
-      lbl_rota_filha: 'ROTA FILHA', lbl_qr_filha: 'QR DA ROTA FILHA', lbl_rota_mae: 'ROTA MAE',
-      lbl_agencia: 'AGENCIA', lbl_saca: 'SACA', de: 'de'
+      de: 'de'
     },
     es: {
       site: 'Sitio', avail_bags: 'Sacas disponibles ↗', optimization: 'Optimización',
@@ -3131,8 +3122,7 @@ var qrcode = function() {
       fisicas_hint: 'Si esta saca del sistema corresponde a más de una saca física, la etiqueta muestra "N DE total" para cada una, con el serial de la fecha ya incluido.',
       log_title: 'Registro de impresión (opcional)', log_url: 'URL del Verdi Flow que graba la planilla',
       test_log: 'Probar registro', log_ok: '¡Registro funcionando!', log_fail: 'Registro falló:',
-      lbl_rota_filha: 'RUTA HIJA', lbl_qr_filha: 'QR DE LA RUTA HIJA', lbl_rota_mae: 'RUTA MADRE',
-      lbl_agencia: 'AGENCIA', lbl_saca: 'SACA', de: 'de'
+      de: 'de'
     }
   };
   function t(k) { return (I18N[state.lang] && I18N[state.lang][k]) || I18N.pt[k] || k; }
@@ -3787,23 +3777,24 @@ var qrcode = function() {
     var qr = window.qrcode(0, 'M'); qr.addData(txt); qr.make();
     return qr.createSvgTag({ cellSize: 3, margin: 1, scalable: true });
   }
-  // Serial impresso no rodapé da etiqueta: SITE.ANO.MES.DIA.ROTA_MAE.SACA.NdeTOTAL.
-  // A data embutida garante que nunca se repete de um dia pro outro, sem
-  // precisar de nenhum contador guardado em lugar nenhum.
+  // Serial único de cada etiqueta física: SITE.ANO.MES.DIA.ROTA_MAE.SACA.NdeTOTAL.RANDOM.
+  // Não é impresso como texto — vai só dentro do QR pequeno (e no log do Verdi Flow),
+  // e o token aleatório no final garante que nunca se repete mesmo se a mesma
+  // saca física for reimpressa no mesmo dia.
   function buildSerialCompound(it) {
     var d = new Date();
     var mm = String(d.getMonth() + 1).padStart(2, '0');
     var dd = String(d.getDate()).padStart(2, '0');
-    return [state.site, d.getFullYear(), mm, dd, it.fullRoute, it.num, it.fisicaN + 'DE' + it.fisicaTotal].join('.');
+    var rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+    return [state.site, d.getFullYear(), mm, dd, it.fullRoute, it.num, it.fisicaN + 'DE' + it.fisicaTotal, rand].join('.');
   }
   // Rotas do ciclo CHP (ex.: "X1_CHP") nunca levam carro/agência impressos —
   // fica em branco de propósito. Isso só aparece dentro do ciclo AM.
   function isChpRoute(g) { return /CHP/i.test(g.fullName || g.name || ''); }
   // Se uma saca do sistema tem mais de uma saca física (state.fisicas[num]),
   // gera uma etiqueta por saca física ("N DE total"), todas com o mesmo QR
-  // oficial. A identificação única de cada etiqueta vem do serial composto
-  // impresso no rodapé (site.data.rota_mãe.saca.NdeTOTAL) — a data garante
-  // que nunca se repete de um dia pro outro.
+  // oficial (it.qr). Cada uma recebe também um serial único (it.serial) —
+  // não é impresso como texto, só vai dentro do QR pequeno e no log do Verdi.
   function selectedItems() {
     var numToGroup = {}; state.groups.forEach(function (g) { (g.realSacas || []).forEach(function (n) { numToGroup[n] = g; }); });
     var out = [];
@@ -3813,12 +3804,14 @@ var qrcode = function() {
       var chp = isChpRoute(g);
       var total = (state.fisicas && state.fisicas[num]) || 1;
       for (var i = 1; i <= total; i++) {
-        out.push({
+        var obj = {
           num: num, fisicaN: i, fisicaTotal: total,
           route: g.name, fullRoute: g.fullName || g.name,
           agencia: chp ? '' : (m.agencia || ''), modal: chp ? '' : (m.veiculo || ''),
           qr: state.qrByNum[num] || '', chp: chp
-        });
+        };
+        obj.serial = buildSerialCompound(obj);
+        out.push(obj);
       }
     });
     return out;
@@ -3844,9 +3837,8 @@ var qrcode = function() {
             '<div class="c-route"><h2>' + esc(it.fullRoute) + '</h2></div>' +
             '<div class="c-field"><span>' + esc(it.chp ? '' : (it.agencia || '—')) + '</span></div>' +
             '<div class="c-field c-saca"><span>' + esc(it.fisicaN) + ' ' + t('de').toUpperCase() + ' ' + esc(it.fisicaTotal) + '</span>' +
-            '<span class="qr-mini">' + makeQrSvg(it.qr) + '</span></div>' +
-            '<div class="c-qr">' + makeQrSvg(it.qr) + '</div></div>' +
-            '<div class="card-footer">' + esc(buildSerialCompound(it)) + '</div></div>';
+            '<span class="qr-mini">' + makeQrSvg(it.serial) + '</span></div>' +
+            '<div class="c-qr">' + makeQrSvg(it.qr) + '</div></div></div>';
         });
         for (var j = ch.length; j < 4; j++) html += '<div class="card-wrap"><div class="card-et empty"></div></div>';
         html += '</div></div>';
@@ -3864,23 +3856,23 @@ var qrcode = function() {
             '<div class="fcell md"><span class="rot f-info">' + esc(it.fisicaN) + ' ' + t('de').toUpperCase() + ' ' + esc(it.fisicaTotal) + '</span></div>' +
             '</div></div>';
         }
-        html += '<div class="folha-wrap"><div class="folha-page">' + half('oeste') + half('leste') + '</div>' +
-          '<div class="folha-footer">' + esc(buildSerialCompound(it)) + '</div></div>';
+        html += '<div class="folha-wrap"><div class="folha-page">' + half('oeste') + half('leste') + '</div></div>';
       });
     } else { // etiqueta — modelo pedido pelas lideranças: rota filha/QR, rota mãe, agência, saca física
       var c = state.cfgEtq;
+      var scale = Math.max(0.35, Math.min(Math.min(c.w / 7, c.h / 10), 2.5));
       dynStyle('@media print{@page{size:' + c.w + 'cm ' + c.h + 'cm auto;margin:0}' +
-        '.etq2{width:' + c.w + 'cm;height:' + c.h + 'cm;padding:' + c.p + 'cm}}');
+        '.etq2{width:' + c.w + 'cm;height:' + c.h + 'cm;padding:' + c.p + 'cm;--escale:' + scale.toFixed(3) + '}}');
       items.forEach(function (it) {
         html += '<div class="etq2-wrap"><div class="etq2">' +
-          '<div class="row filha"><div class="lbl">' + t('lbl_rota_filha') + '</div><div class="val"><h1>' + esc(it.num) + '</h1></div></div>' +
-          '<div class="row qrrow"><div class="lbl">' + t('lbl_qr_filha') + '</div><div class="val qr-big">' + makeQrSvg(it.qr) + '</div></div>' +
-          '<div class="row mae"><div class="lbl">' + t('lbl_rota_mae') + '</div><div class="val"><h2>' + esc(it.fullRoute) + '</h2></div></div>' +
-          '<div class="row ag"><div class="lbl">' + t('lbl_agencia') + '</div><div class="val"><h2>' + esc(it.chp ? '—' : (it.agencia || '—')) + '</h2></div></div>' +
-          '<div class="row saca"><div class="lbl">' + t('lbl_saca') + '</div><div class="val">' +
+          '<div class="row filha"><div class="val"><h1>' + esc(it.num) + '</h1></div></div>' +
+          '<div class="row qrrow"><div class="val qr-big">' + makeQrSvg(it.qr) + '</div></div>' +
+          '<div class="row mae"><div class="val"><h2>' + esc(it.fullRoute) + '</h2></div></div>' +
+          '<div class="row ag"><div class="val"><h2>' + esc(it.chp ? '—' : (it.agencia || '—')) + '</h2></div></div>' +
+          '<div class="row saca"><div class="val">' +
             '<span class="ntotal">' + esc(it.fisicaN) + ' ' + t('de').toUpperCase() + ' ' + esc(it.fisicaTotal) + '</span>' +
-            '<span class="qr-mini">' + makeQrSvg(it.qr) + '</span></div></div>' +
-          '</div><div class="etq2-footer">' + esc(buildSerialCompound(it)) + '</div></div>';
+            '<span class="qr-mini">' + makeQrSvg(it.serial) + '</span></div></div>' +
+          '</div></div>';
       });
     }
 
@@ -3900,7 +3892,7 @@ var qrcode = function() {
     var payload = { items: items.map(function (it) {
       return { timestamp: now, saca: it.num, rota_mae: it.fullRoute, rota: it.route,
         agencia: it.chp ? '' : it.agencia, saca_fisica: it.fisicaN, qtd_fisicas: it.fisicaTotal,
-        serial: buildSerialCompound(it) };
+        serial: it.serial };
     }) };
     fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       .then(function (res) { if (!res.ok) throw new Error('HTTP ' + res.status); lastLogError = ''; })

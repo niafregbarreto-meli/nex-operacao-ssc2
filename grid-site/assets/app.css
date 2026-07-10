@@ -372,11 +372,9 @@ table.data tbody tr:hover { background: var(--andes-blue-bg); }
   /* ===== CARTÃO 4x1: rota filha / rota mãe(cinza) / agência / saca física / QR ===== */
   .print-grid { display: grid; grid-template-columns: 90mm 90mm; grid-template-rows: 130mm 130mm; gap: 10mm; }
   .card-wrap { width: 90mm; height: 130mm; display: flex; flex-direction: column; }
-  .card-et { width: 90mm; height: 122mm; display: flex; flex-direction: column; overflow: hidden;
+  .card-et { width: 90mm; height: 130mm; display: flex; flex-direction: column; overflow: hidden;
     border: 3px solid #000; border-radius: 10px; background: #fff; }
-  .card-et.empty { border: none; height: 130mm; }
-  .card-footer { height: 8mm; display: flex; align-items: center; justify-content: center;
-    font: 9pt 'Courier New', monospace; }
+  .card-et.empty { border: none; }
   .c-num { height: 38mm; display: flex; align-items: center; justify-content: center; border-bottom: 2px solid #000; }
   .c-num h1 { font: 900 80pt 'Arial Black', Arial, sans-serif; margin: 0; line-height: .8; }
   .c-route { height: 18mm; display: flex; align-items: center; justify-content: center; border-bottom: 2px solid #000;
@@ -393,8 +391,6 @@ table.data tbody tr:hover { background: var(--andes-blue-bg); }
   .folha-wrap { width: 210mm; height: 297mm; display: flex; flex-direction: column; page-break-after: always; }
   .folha-wrap:last-child { page-break-after: auto; }
   .folha-page { flex: 1; display: flex; overflow: hidden; }
-  .folha-footer { height: 8mm; flex: none; display: flex; align-items: center; justify-content: center;
-    font: 9pt 'Courier New', monospace; }
   .quad { width: 105mm; padding: 5mm; box-sizing: border-box; display: flex; }
   .quad.oeste { border-right: 1px dashed #999; }
   .fbox { flex: 1; border: 3px solid #000; border-radius: 14px; display: grid;
@@ -431,22 +427,18 @@ table.data tbody tr:hover { background: var(--andes-blue-bg); }
   }
   .etq2 .row { display: flex; align-items: stretch; border-bottom: 2px solid #000; overflow: hidden; }
   .etq2 .row:last-child { border-bottom: none; }
-  .etq2 .lbl {
-    width: 36%; flex: none; display: flex; align-items: center; padding-left: 2mm; padding-right: 1mm;
-    font: 700 7.5pt Arial, sans-serif; text-transform: uppercase; border-right: 2px solid #000; line-height: 1.05;
-  }
-  .etq2 .val { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; gap: 3mm; padding: 0 2mm; }
+  .etq2 .val { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden;
+    gap: calc(3mm * var(--escale, 1)); padding: 0 2mm; }
   .etq2 .row.filha { flex: 1.4; }
   .etq2 .row.qrrow { flex: 3; }
   .etq2 .row.mae { flex: .9; }
   .etq2 .row.ag { flex: .9; }
   .etq2 .row.saca { flex: 1.2; }
   .etq2 .row.mae .val { background: #000 !important; }
-  .etq2 .val h1 { margin: 0; font: 900 52pt 'Arial Black', Arial, sans-serif; line-height: .85; }
-  .etq2 .val h2 { margin: 0; font: 900 20pt 'Arial Black', Arial, sans-serif; text-transform: uppercase; }
+  .etq2 .val h1 { margin: 0; font: 900 calc(52pt * var(--escale, 1)) 'Arial Black', Arial, sans-serif; line-height: .85; }
+  .etq2 .val h2 { margin: 0; font: 900 calc(20pt * var(--escale, 1)) 'Arial Black', Arial, sans-serif; text-transform: uppercase; }
   .etq2 .row.mae .val h2 { color: #fff; }
-  .etq2 .qr-big svg { width: 32mm; height: 32mm; }
-  .etq2 .ntotal { font: 900 15pt 'Arial Black', Arial, sans-serif; white-space: nowrap; }
-  .etq2 .qr-mini svg { width: 12mm; height: 12mm; }
-  .etq2-footer { margin-top: 2mm; font: 10pt 'Courier New', monospace; }
+  .etq2 .qr-big svg { width: calc(32mm * var(--escale, 1)); height: calc(32mm * var(--escale, 1)); }
+  .etq2 .ntotal { font: 900 calc(15pt * var(--escale, 1)) 'Arial Black', Arial, sans-serif; white-space: nowrap; }
+  .etq2 .qr-mini svg { width: calc(12mm * var(--escale, 1)); height: calc(12mm * var(--escale, 1)); }
 }

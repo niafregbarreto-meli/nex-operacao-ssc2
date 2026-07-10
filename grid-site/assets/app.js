@@ -84,8 +84,7 @@
       fisicas_hint: 'Se essa saca do sistema corresponde a mais de uma saca física, a etiqueta mostra "N DE total" pra cada uma, com o serial da data já embutido.',
       log_title: 'Registro de impressão (opcional)', log_url: 'URL do Verdi Flow que grava a planilha',
       test_log: 'Testar registro', log_ok: 'Registro funcionando!', log_fail: 'Registro falhou:',
-      lbl_rota_filha: 'ROTA FILHA', lbl_qr_filha: 'QR DA ROTA FILHA', lbl_rota_mae: 'ROTA MAE',
-      lbl_agencia: 'AGENCIA', lbl_saca: 'SACA', de: 'de'
+      de: 'de'
     },
     es: {
       site: 'Sitio', avail_bags: 'Sacas disponibles ↗', optimization: 'Optimización',
@@ -119,8 +118,7 @@
       fisicas_hint: 'Si esta saca del sistema corresponde a más de una saca física, la etiqueta muestra "N DE total" para cada una, con el serial de la fecha ya incluido.',
       log_title: 'Registro de impresión (opcional)', log_url: 'URL del Verdi Flow que graba la planilla',
       test_log: 'Probar registro', log_ok: '¡Registro funcionando!', log_fail: 'Registro falló:',
-      lbl_rota_filha: 'RUTA HIJA', lbl_qr_filha: 'QR DE LA RUTA HIJA', lbl_rota_mae: 'RUTA MADRE',
-      lbl_agencia: 'AGENCIA', lbl_saca: 'SACA', de: 'de'
+      de: 'de'
     }
   };
   function t(k) { return (I18N[state.lang] && I18N[state.lang][k]) || I18N.pt[k] || k; }
@@ -775,23 +773,24 @@
     var qr = window.qrcode(0, 'M'); qr.addData(txt); qr.make();
     return qr.createSvgTag({ cellSize: 3, margin: 1, scalable: true });
   }
-  // Serial impresso no rodapé da etiqueta: SITE.ANO.MES.DIA.ROTA_MAE.SACA.NdeTOTAL.
-  // A data embutida garante que nunca se repete de um dia pro outro, sem
-  // precisar de nenhum contador guardado em lugar nenhum.
+  // Serial único de cada etiqueta física: SITE.ANO.MES.DIA.ROTA_MAE.SACA.NdeTOTAL.RANDOM.
+  // Não é impresso como texto — vai só dentro do QR pequeno (e no log do Verdi Flow),
+  // e o token aleatório no final garante que nunca se repete mesmo se a mesma
+  // saca física for reimpressa no mesmo dia.
   function buildSerialCompound(it) {
     var d = new Date();
     var mm = String(d.getMonth() + 1).padStart(2, '0');
     var dd = String(d.getDate()).padStart(2, '0');
-    return [state.site, d.getFullYear(), mm, dd, it.fullRoute, it.num, it.fisicaN + 'DE' + it.fisicaTotal].join('.');
+    var rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+    return [state.site, d.getFullYear(), mm, dd, it.fullRoute, it.num, it.fisicaN + 'DE' + it.fisicaTotal, rand].join('.');
   }
   // Rotas do ciclo CHP (ex.: "X1_CHP") nunca levam carro/agência impressos —
   // fica em branco de propósito. Isso só aparece dentro do ciclo AM.
   function isChpRoute(g) { return /CHP/i.test(g.fullName || g.name || ''); }
   // Se uma saca do sistema tem mais de uma saca física (state.fisicas[num]),
   // gera uma etiqueta por saca física ("N DE total"), todas com o mesmo QR
-  // oficial. A identificação única de cada etiqueta vem do serial composto
-  // impresso no rodapé (site.data.rota_mãe.saca.NdeTOTAL) — a data garante
-  // que nunca se repete de um dia pro outro.
+  // oficial (it.qr). Cada uma recebe também um serial único (it.serial) —
+  // não é impresso como texto, só vai dentro do QR pequeno e no log do Verdi.
   function selectedItems() {
     var numToGroup = {}; state.groups.forEach(function (g) { (g.realSacas || []).forEach(function (n) { numToGroup[n] = g; }); });
     var out = [];
@@ -801,12 +800,14 @@
       var chp = isChpRoute(g);
       var total = (state.fisicas && state.fisicas[num]) || 1;
       for (var i = 1; i <= total; i++) {
-        out.push({
+        var obj = {
           num: num, fisicaN: i, fisicaTotal: total,
           route: g.name, fullRoute: g.fullName || g.name,
           agencia: chp ? '' : (m.agencia || ''), modal: chp ? '' : (m.veiculo || ''),
           qr: state.qrByNum[num] || '', chp: chp
-        });
+        };
+        obj.serial = buildSerialCompound(obj);
+        out.push(obj);
       }
     });
     return out;
@@ -832,9 +833,8 @@
             '<div class="c-route"><h2>' + esc(it.fullRoute) + '</h2></div>' +
             '<div class="c-field"><span>' + esc(it.chp ? '' : (it.agencia || '—')) + '</span></div>' +
             '<div class="c-field c-saca"><span>' + esc(it.fisicaN) + ' ' + t('de').toUpperCase() + ' ' + esc(it.fisicaTotal) + '</span>' +
-            '<span class="qr-mini">' + makeQrSvg(it.qr) + '</span></div>' +
-            '<div class="c-qr">' + makeQrSvg(it.qr) + '</div></div>' +
-            '<div class="card-footer">' + esc(buildSerialCompound(it)) + '</div></div>';
+            '<span class="qr-mini">' + makeQrSvg(it.serial) + '</span></div>' +
+            '<div class="c-qr">' + makeQrSvg(it.qr) + '</div></div></div>';
         });
         for (var j = ch.length; j < 4; j++) html += '<div class="card-wrap"><div class="card-et empty"></div></div>';
         html += '</div></div>';
@@ -852,23 +852,23 @@
             '<div class="fcell md"><span class="rot f-info">' + esc(it.fisicaN) + ' ' + t('de').toUpperCase() + ' ' + esc(it.fisicaTotal) + '</span></div>' +
             '</div></div>';
         }
-        html += '<div class="folha-wrap"><div class="folha-page">' + half('oeste') + half('leste') + '</div>' +
-          '<div class="folha-footer">' + esc(buildSerialCompound(it)) + '</div></div>';
+        html += '<div class="folha-wrap"><div class="folha-page">' + half('oeste') + half('leste') + '</div></div>';
       });
     } else { // etiqueta — modelo pedido pelas lideranças: rota filha/QR, rota mãe, agência, saca física
       var c = state.cfgEtq;
+      var scale = Math.max(0.35, Math.min(Math.min(c.w / 7, c.h / 10), 2.5));
       dynStyle('@media print{@page{size:' + c.w + 'cm ' + c.h + 'cm auto;margin:0}' +
-        '.etq2{width:' + c.w + 'cm;height:' + c.h + 'cm;padding:' + c.p + 'cm}}');
+        '.etq2{width:' + c.w + 'cm;height:' + c.h + 'cm;padding:' + c.p + 'cm;--escale:' + scale.toFixed(3) + '}}');
       items.forEach(function (it) {
         html += '<div class="etq2-wrap"><div class="etq2">' +
-          '<div class="row filha"><div class="lbl">' + t('lbl_rota_filha') + '</div><div class="val"><h1>' + esc(it.num) + '</h1></div></div>' +
-          '<div class="row qrrow"><div class="lbl">' + t('lbl_qr_filha') + '</div><div class="val qr-big">' + makeQrSvg(it.qr) + '</div></div>' +
-          '<div class="row mae"><div class="lbl">' + t('lbl_rota_mae') + '</div><div class="val"><h2>' + esc(it.fullRoute) + '</h2></div></div>' +
-          '<div class="row ag"><div class="lbl">' + t('lbl_agencia') + '</div><div class="val"><h2>' + esc(it.chp ? '—' : (it.agencia || '—')) + '</h2></div></div>' +
-          '<div class="row saca"><div class="lbl">' + t('lbl_saca') + '</div><div class="val">' +
+          '<div class="row filha"><div class="val"><h1>' + esc(it.num) + '</h1></div></div>' +
+          '<div class="row qrrow"><div class="val qr-big">' + makeQrSvg(it.qr) + '</div></div>' +
+          '<div class="row mae"><div class="val"><h2>' + esc(it.fullRoute) + '</h2></div></div>' +
+          '<div class="row ag"><div class="val"><h2>' + esc(it.chp ? '—' : (it.agencia || '—')) + '</h2></div></div>' +
+          '<div class="row saca"><div class="val">' +
             '<span class="ntotal">' + esc(it.fisicaN) + ' ' + t('de').toUpperCase() + ' ' + esc(it.fisicaTotal) + '</span>' +
-            '<span class="qr-mini">' + makeQrSvg(it.qr) + '</span></div></div>' +
-          '</div><div class="etq2-footer">' + esc(buildSerialCompound(it)) + '</div></div>';
+            '<span class="qr-mini">' + makeQrSvg(it.serial) + '</span></div></div>' +
+          '</div></div>';
       });
     }
 
@@ -888,7 +888,7 @@
     var payload = { items: items.map(function (it) {
       return { timestamp: now, saca: it.num, rota_mae: it.fullRoute, rota: it.route,
         agencia: it.chp ? '' : it.agencia, saca_fisica: it.fisicaN, qtd_fisicas: it.fisicaTotal,
-        serial: buildSerialCompound(it) };
+        serial: it.serial };
     }) };
     fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       .then(function (res) { if (!res.ok) throw new Error('HTTP ' + res.status); lastLogError = ''; })
