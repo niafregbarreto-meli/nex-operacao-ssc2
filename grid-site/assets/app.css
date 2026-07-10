@@ -273,6 +273,13 @@ select.native {
 .saca.selected { background: var(--andes-blue); border-color: var(--andes-blue); color: #fff; box-shadow: var(--shadow-sm); }
 /* small dot bottom-right: green = QR real na base, gray = pendente */
 .saca .dot { position: absolute; bottom: 4px; right: 5px; width: 6px; height: 6px; border-radius: 999px; background: var(--text-3); }
+/* badge com a quantidade de sacas físicas, quando > 1 */
+.saca .fis-badge {
+  position: absolute; top: -7px; left: -7px; min-width: 16px; height: 16px; padding: 0 3px;
+  border-radius: 999px; background: var(--purple); color: #fff; font-size: 9px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center; line-height: 1; z-index: 1;
+}
+.saca.selected .fis-badge { border: 1px solid rgba(255,255,255,.6); }
 .saca .dot.has { background: var(--success); }
 .saca.selected .dot { background: rgba(255,255,255,.85); }
 .saca .rm {

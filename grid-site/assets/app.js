@@ -34,6 +34,7 @@
       qrByNum: {},             // num -> QR string to encode
       metaByNum: {},           // num -> { agencia, veiculo(limpo), rotasacapl }
       renum: {},               // "GRUPO#idx" -> número forçado manualmente pelo operador
+      fisicas: {},             // número da saca -> quantidade de sacas físicas (default 1)
       cfgEtq: { w: 12, h: 5, p: 0.4 }
     };
   }
@@ -74,10 +75,12 @@
       test_conn: 'Testar / atualizar agora', no_diag: 'Nenhuma tentativa ainda.', close: 'Fechar', upload_opt: 'Subir otimização',
       clear_all: 'Limpar tudo (recomeçar)', clear_all_confirm: 'Isso apaga a otimização, seleção e QR salvos. Continuar?', cleared_ok: 'Tudo limpo!',
       change_opt: 'Trocar',
-      renum_title: 'Renumerar saca', renum_label: 'Novo número',
+      renum_title: 'Editar saca', renum_label: 'Número',
       renum_hint: 'Use só se o número físico da saca estiver diferente do que o sistema atribuiu.',
       renum_invalid: 'Número inválido.', renum_reserved: 'Esse número é reservado pelo sistema — não pode ser usado.',
-      renum_taken: 'Esse número já está em uso por outra saca.', renum_ok: 'Saca renumerada!'
+      renum_taken: 'Esse número já está em uso por outra saca.', renum_ok: 'Saca atualizada!',
+      fisicas_label: 'Quantidade de sacas físicas',
+      fisicas_hint: 'Se essa saca do sistema corresponde a mais de uma saca física, a impressão gera uma etiqueta por saca física (1-A, 1-B…), todas com o mesmo QR.'
     },
     es: {
       site: 'Sitio', avail_bags: 'Sacas disponibles ↗', optimization: 'Optimización',
@@ -103,10 +106,12 @@
       test_conn: 'Probar / actualizar ahora', no_diag: 'Ninguna tentativa aún.', close: 'Cerrar', upload_opt: 'Subir optimización',
       clear_all: 'Limpiar todo (reiniciar)', clear_all_confirm: 'Esto borra la optimización, selección y QR guardados. ¿Continuar?', cleared_ok: '¡Todo limpio!',
       change_opt: 'Cambiar',
-      renum_title: 'Renumerar saca', renum_label: 'Nuevo número',
+      renum_title: 'Editar saca', renum_label: 'Número',
       renum_hint: 'Usá esto solo si el número físico de la saca es distinto del que el sistema asignó.',
       renum_invalid: 'Número inválido.', renum_reserved: 'Ese número está reservado por el sistema — no se puede usar.',
-      renum_taken: 'Ese número ya está en uso por otra saca.', renum_ok: '¡Saca renumerada!'
+      renum_taken: 'Ese número ya está en uso por otra saca.', renum_ok: '¡Saca actualizada!',
+      fisicas_label: 'Cantidad de sacas físicas',
+      fisicas_hint: 'Si esta saca del sistema corresponde a más de una saca física, la impresión genera una etiqueta por saca física (1-A, 1-B…), todas con el mismo QR.'
     }
   };
   function t(k) { return (I18N[state.lang] && I18N[state.lang][k]) || I18N.pt[k] || k; }
@@ -455,7 +460,7 @@
     // Nova otimização = numeração global do zero: exclusões/seleção da rodada
     // anterior não têm mais sentido (o mesmo número agora é outra saca).
     state.source = 'opt'; state.groups = groups; state.optFileName = pending.fileName;
-    state.selection = []; state.excluded = []; state.renum = {};
+    state.selection = []; state.excluded = []; state.renum = {}; state.fisicas = {};
     savedSession = null; // essa otimização nova substitui qualquer "salvo" antigo
     pending = null; persist(); render();
     toast(groups.length + (state.lang === 'pt' ? ' rotas carregadas' : ' rutas cargadas'), true);
@@ -580,7 +585,7 @@
   // × no chip do arquivo ativo — descarta a otimização carregada e volta
   // pra tela vazia, sem precisar passar por Configurações.
   function clearOptimization() {
-    state.source = null; state.groups = []; state.selection = []; state.excluded = []; state.renum = {};
+    state.source = null; state.groups = []; state.selection = []; state.excluded = []; state.renum = {}; state.fisicas = {};
     state.optFileName = null; state.qrByNum = {}; state.metaByNum = {}; state.lastSave = null; state.lastSheetSync = null;
     savedSession = null;
     persist(); render();
@@ -589,7 +594,7 @@
   // salvo que ficou errado (ex.: rotas antigas construídas por engano pelo
   // auto-sync). Mantém idioma/site.
   function clearAll() {
-    state.source = null; state.groups = []; state.selection = []; state.excluded = []; state.renum = {};
+    state.source = null; state.groups = []; state.selection = []; state.excluded = []; state.renum = {}; state.fisicas = {};
     state.optFileName = null; state.qrByNum = {}; state.metaByNum = {}; state.lastSave = null; state.lastSheetSync = null;
     savedSession = null;
     persist(); render();
@@ -660,8 +665,10 @@
       var grid = '<div class="saca-grid">';
       nums.forEach(function (num, idx) {
         var isSel = sel.has(num);
+        var fis = (state.fisicas && state.fisicas[num]) || 1;
         grid += '<button class="saca' + (isSel ? ' selected' : '') + '" data-num="' + num + '" data-idx="' + idx + '" title="' +
           (state.lang === 'pt' ? 'Duplo clique pra renumerar' : 'Doble clic para renumerar') + '">' + num +
+          (fis > 1 ? '<span class="fis-badge" title="' + fis + (state.lang === 'pt' ? ' sacas físicas' : ' sacas físicas') + '">×' + fis + '</span>' : '') +
           '<span class="dot' + (hasQr(num) ? ' has' : '') + '" title="' + (hasQr(num) ? 'QR' : 'sem QR') + '"></span>' +
           '<span class="rm" data-rm="' + num + '">&times;</span></button>';
       });
@@ -721,7 +728,13 @@
     all.forEach(function (n) { if (allSel) s.delete(n); else s.add(n); });
     state.selection = Array.from(s); persist(); renderRoutes(); updatePrintBar();
   }
-  function updatePrintBar() { var n = state.selection.length; $('printCount').textContent = n; $('btnPrint').disabled = (n === 0); }
+  function updatePrintBar() {
+    var n = state.selection.length;
+    var totalLabels = 0;
+    state.selection.forEach(function (num) { totalLabels += (state.fisicas && state.fisicas[num]) || 1; });
+    $('printCount').textContent = totalLabels;
+    $('btnPrint').disabled = (n === 0);
+  }
 
   function saveChoice() {
     state.lastSave = new Date().toLocaleString(state.lang === 'pt' ? 'pt-BR' : 'es-AR');
@@ -754,14 +767,23 @@
   // Rotas do ciclo CHP (ex.: "X1_CHP") nunca levam carro/agência impressos —
   // fica em branco de propósito. Isso só aparece dentro do ciclo AM.
   function isChpRoute(g) { return /CHP/i.test(g.fullName || g.name || ''); }
+  // Se uma saca do sistema tem mais de uma saca física (state.fisicas[num]),
+  // gera uma etiqueta por saca física (serial "NUM-A", "NUM-B"…), todas com
+  // o mesmo QR oficial — o serial é só pra controle interno impresso.
   function selectedItems() {
     var numToGroup = {}; state.groups.forEach(function (g) { (g.realSacas || []).forEach(function (n) { numToGroup[n] = g; }); });
-    return state.selection.slice().sort(function (a, b) { return a - b; }).map(function (num) {
-      var g = numToGroup[num]; if (!g) return null;
+    var out = [];
+    state.selection.slice().sort(function (a, b) { return a - b; }).forEach(function (num) {
+      var g = numToGroup[num]; if (!g) return;
       var m = state.metaByNum[num] || {};
       var chp = isChpRoute(g);
-      return { num: num, route: g.name, agencia: chp ? '' : (m.agencia || ''), modal: chp ? '' : (m.veiculo || ''), qr: state.qrByNum[num] || '', chp: chp };
-    }).filter(Boolean);
+      var count = (state.fisicas && state.fisicas[num]) || 1;
+      for (var i = 0; i < count; i++) {
+        var serial = count > 1 ? (num + '-' + String.fromCharCode(65 + i)) : String(num);
+        out.push({ num: num, serial: serial, route: g.name, agencia: chp ? '' : (m.agencia || ''), modal: chp ? '' : (m.veiculo || ''), qr: state.qrByNum[num] || '', chp: chp });
+      }
+    });
+    return out;
   }
 
   function dynStyle(css) {
@@ -780,7 +802,7 @@
         var ch = items.slice(i, i + 4);
         html += '<div class="print-page"><div class="print-grid">';
         ch.forEach(function (it) {
-          html += '<div class="card-et"><div class="c-num"><h1>' + esc(it.num) + '</h1></div>' +
+          html += '<div class="card-et"><div class="c-num"><h1>' + esc(it.serial) + '</h1></div>' +
             '<div class="c-route"><h2>' + esc(it.route) + '</h2></div>' +
             '<div class="c-field"><span>' + esc(it.chp ? '' : (it.agencia || '—')) + '</span></div>' +
             '<div class="c-field"><span>' + esc(it.chp ? '' : (it.modal || '—')) + '</span></div>' +
@@ -795,7 +817,7 @@
         function half(side) {
           return '<div class="quad ' + side + '"><div class="fbox">' +
             '<div class="fcell qN">' + qr + '</div>' +
-            '<div class="fcell num"><span class="rot f-num">' + esc(it.num) + '</span></div>' +
+            '<div class="fcell num"><span class="rot f-num">' + esc(it.serial) + '</span></div>' +
             '<div class="fcell qS">' + qr + '</div>' +
             '<div class="fcell ag"><span class="rot f-info">' + esc(it.chp ? '' : (it.agencia || '—')) + '</span></div>' +
             '<div class="fcell rt f-gray"><span class="rot f-route">' + esc(it.route) + '</span></div>' +
@@ -812,7 +834,7 @@
         '.etq .qr{width:' + inner + 'cm;height:' + inner + 'cm}}');
       items.forEach(function (it) {
         html += '<div class="etq"><div class="qr">' + makeQrSvg(it.qr) + '</div><div class="lines">' +
-          '<div class="ln"><span class="k">SACA:</span>' + esc(it.num) + '</div>' +
+          '<div class="ln"><span class="k">SACA:</span>' + esc(it.serial) + '</div>' +
           '<div class="ln"><span class="k">ROTA:</span>' + esc(it.route) + '</div>' +
           '<div class="ln"><span class="k">AGÊNCIA:</span>' + esc(it.chp ? '' : (it.agencia || '—')) + '</div>' +
           '</div></div>';
@@ -842,46 +864,57 @@
   function openRenum(groupName, idx, oldNum) {
     renumTarget = { groupName: groupName, idx: idx, oldNum: oldNum };
     $('renumInput').value = oldNum;
+    $('renumFisicas').value = (state.fisicas && state.fisicas[oldNum]) || 1;
     $('renumOverlay').classList.add('open');
     $('renumInput').focus();
   }
   function saveRenum() {
     if (!renumTarget) return;
+    var oldNum = renumTarget.oldNum;
     var newNum = parseInt($('renumInput').value, 10);
+    var fisicas = parseInt($('renumFisicas').value, 10);
+    if (isNaN(fisicas) || fisicas < 1) fisicas = 1;
     if (isNaN(newNum) || newNum <= 0) { toast(t('renum_invalid'), false); return; }
-    if (newNum === renumTarget.oldNum) { $('renumOverlay').classList.remove('open'); return; }
-    if (RESERVED_NUMS.indexOf(newNum) !== -1) { toast(t('renum_reserved'), false); return; }
 
     var g = state.groups.filter(function (x) { return x.name === renumTarget.groupName; })[0];
     if (!g) return;
-    // Rejeita se o número já existir em QUALQUER rota — seleção, QR e
-    // agência/modal são amarrados só ao número (não à rota), então duas
-    // sacas com o mesmo número ficam emaranhadas (selecionar uma seleciona
-    // as duas, etc.). Duplicidade nunca é segura aqui, nem temporariamente.
-    var taken = false;
-    state.groups.forEach(function (x) { if ((x.realSacas || []).indexOf(newNum) !== -1) taken = true; });
-    if (taken) { toast(t('renum_taken'), false); return; }
-    var idx = g.realSacas.indexOf(renumTarget.oldNum);
-    if (idx === -1) return;
-    g.realSacas[idx] = newNum;
-    g.realSacas.sort(function (a, b) { return a - b; });
-    if (!state.renum) state.renum = {};
-    state.renum[renumTarget.groupName + '#' + renumTarget.idx] = newNum;
+    if (!state.fisicas) state.fisicas = {};
 
-    var s = selectionSet();
-    if (s.has(renumTarget.oldNum)) { s.delete(renumTarget.oldNum); s.add(newNum); state.selection = Array.from(s); }
-    var ex = excludedSet();
-    if (ex.has(renumTarget.oldNum)) { ex.delete(renumTarget.oldNum); ex.add(newNum); state.excluded = Array.from(ex); }
-    // QR/agência/modal são amarrados ao NÚMERO na base — ao renumerar, o
-    // dado antigo não vale mais pra essa saca; busca de novo pro número novo.
-    delete state.qrByNum[renumTarget.oldNum];
-    delete state.metaByNum[renumTarget.oldNum];
+    if (newNum !== oldNum) {
+      if (RESERVED_NUMS.indexOf(newNum) !== -1) { toast(t('renum_reserved'), false); return; }
+      // Rejeita se o número já existir em QUALQUER rota — seleção, QR e
+      // agência/modal são amarrados só ao número (não à rota), então duas
+      // sacas com o mesmo número ficam emaranhadas (selecionar uma seleciona
+      // as duas, etc.). Duplicidade nunca é segura aqui, nem temporariamente.
+      var taken = false;
+      state.groups.forEach(function (x) { if ((x.realSacas || []).indexOf(newNum) !== -1) taken = true; });
+      if (taken) { toast(t('renum_taken'), false); return; }
+      var idx = g.realSacas.indexOf(oldNum);
+      if (idx === -1) return;
+      g.realSacas[idx] = newNum;
+      g.realSacas.sort(function (a, b) { return a - b; });
+      if (!state.renum) state.renum = {};
+      state.renum[renumTarget.groupName + '#' + renumTarget.idx] = newNum;
+
+      var s = selectionSet();
+      if (s.has(oldNum)) { s.delete(oldNum); s.add(newNum); state.selection = Array.from(s); }
+      var ex = excludedSet();
+      if (ex.has(oldNum)) { ex.delete(oldNum); ex.add(newNum); state.excluded = Array.from(ex); }
+      // QR/agência/modal são amarrados ao NÚMERO na base — ao renumerar, o
+      // dado antigo não vale mais pra essa saca; busca de novo pro número novo.
+      delete state.qrByNum[oldNum];
+      delete state.metaByNum[oldNum];
+      delete state.fisicas[oldNum];
+    }
+
+    if (!state.fisicas) state.fisicas = {};
+    if (fisicas > 1) state.fisicas[newNum] = fisicas; else delete state.fisicas[newNum];
 
     renumTarget = null;
     persist(); render();
     $('renumOverlay').classList.remove('open');
     toast(t('renum_ok'), true);
-    loadQrBase(true);
+    if (newNum !== oldNum) loadQrBase(true);
   }
 
   // ---------------------------------------------------------------- settings + diagnostics
