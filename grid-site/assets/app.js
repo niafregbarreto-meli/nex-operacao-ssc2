@@ -34,7 +34,8 @@
       qrByNum: {},             // num -> QR string to encode
       metaByNum: {},           // num -> { agencia, veiculo(limpo), rotasacapl }
       renum: {},               // "GRUPO#idx" -> número forçado manualmente pelo operador
-      fisicas: {},             // número da saca -> quantidade de sacas físicas (default 1)
+      fisicas: {},             // número da saca -> [seriais únicos das sacas físicas] (default: sem entrada = 1 saca física, sem sufixo)
+      serialCounter: 1,        // contador global de seriais físicos — nunca reseta, nem trocando de otimização
       logWebhookUrl: '',       // Verdi Flow que grava o registro de impressão na planilha (opcional)
       cfgEtq: { w: 12, h: 5, p: 0.4 }
     };
@@ -81,7 +82,7 @@
       renum_invalid: 'Número inválido.', renum_reserved: 'Esse número é reservado pelo sistema — não pode ser usado.',
       renum_taken: 'Esse número já está em uso por outra saca.', renum_ok: 'Saca atualizada!',
       fisicas_label: 'Quantidade de sacas físicas',
-      fisicas_hint: 'Se essa saca do sistema corresponde a mais de uma saca física, a impressão gera uma etiqueta por saca física (1-A, 1-B…), todas com o mesmo QR.',
+      fisicas_hint: 'Se essa saca do sistema corresponde a mais de uma saca física, cada uma recebe um serial único (nunca se repete, nem em outro dia) e a impressão gera uma etiqueta por saca física — todas com o mesmo QR.',
       log_title: 'Registro de impressão (opcional)', log_url: 'URL do Verdi Flow que grava a planilha',
       test_log: 'Testar registro', log_ok: 'Registro funcionando!', log_fail: 'Registro falhou:'
     },
@@ -114,7 +115,7 @@
       renum_invalid: 'Número inválido.', renum_reserved: 'Ese número está reservado por el sistema — no se puede usar.',
       renum_taken: 'Ese número ya está en uso por otra saca.', renum_ok: '¡Saca actualizada!',
       fisicas_label: 'Cantidad de sacas físicas',
-      fisicas_hint: 'Si esta saca del sistema corresponde a más de una saca física, la impresión genera una etiqueta por saca física (1-A, 1-B…), todas con el mismo QR.',
+      fisicas_hint: 'Si esta saca del sistema corresponde a más de una saca física, cada una recibe un serial único (nunca se repite, ni en otro día) y la impresión genera una etiqueta por saca física — todas con el mismo QR.',
       log_title: 'Registro de impresión (opcional)', log_url: 'URL del Verdi Flow que graba la planilla',
       test_log: 'Probar registro', log_ok: '¡Registro funcionando!', log_fail: 'Registro falló:'
     }
@@ -167,7 +168,8 @@
     var toSave = state;
     if (!state.groups.length && savedSession && savedSession.groups && savedSession.groups.length) {
       toSave = Object.assign({}, savedSession, {
-        lang: state.lang, site: state.site, qrBaseUrl: state.qrBaseUrl, cfgEtq: state.cfgEtq, updatedAt: state.updatedAt
+        lang: state.lang, site: state.site, qrBaseUrl: state.qrBaseUrl, cfgEtq: state.cfgEtq,
+        logWebhookUrl: state.logWebhookUrl, serialCounter: state.serialCounter, updatedAt: state.updatedAt
       });
     }
     window.GridStore.saveDebounced(toSave, 400);
@@ -179,11 +181,14 @@
       savedSession = loaded;
       // Só preferências entram automaticamente — a otimização em si exige
       // "Recuperar salvo" (ou um novo upload). Abrir o app nunca carrega
-      // sozinho a otimização de outro dia.
+      // sozinho a otimização de outro dia. serialCounter é o contador global
+      // de seriais físicos — NUNCA reseta, nem trocando de otimização.
       state.lang = loaded.lang || state.lang;
       state.site = loaded.site || state.site;
       state.qrBaseUrl = loaded.qrBaseUrl || state.qrBaseUrl;
       state.cfgEtq = loaded.cfgEtq || state.cfgEtq;
+      state.logWebhookUrl = loaded.logWebhookUrl || state.logWebhookUrl;
+      state.serialCounter = loaded.serialCounter || state.serialCounter;
     }
     var badge = $('storageBadge');
     if (window.GridStore.isRunningInGrid()) { badge.textContent = 'Grid'; badge.classList.remove('local'); }
@@ -670,7 +675,7 @@
       var grid = '<div class="saca-grid">';
       nums.forEach(function (num, idx) {
         var isSel = sel.has(num);
-        var fis = (state.fisicas && state.fisicas[num]) || 1;
+        var fis = ((state.fisicas && state.fisicas[num]) || []).length;
         grid += '<button class="saca' + (isSel ? ' selected' : '') + '" data-num="' + num + '" data-idx="' + idx + '" title="' +
           (state.lang === 'pt' ? 'Duplo clique pra renumerar' : 'Doble clic para renumerar') + '">' + num +
           (fis > 1 ? '<span class="fis-badge" title="' + fis + (state.lang === 'pt' ? ' sacas físicas' : ' sacas físicas') + '">×' + fis + '</span>' : '') +
@@ -736,7 +741,7 @@
   function updatePrintBar() {
     var n = state.selection.length;
     var totalLabels = 0;
-    state.selection.forEach(function (num) { totalLabels += (state.fisicas && state.fisicas[num]) || 1; });
+    state.selection.forEach(function (num) { totalLabels += ((state.fisicas && state.fisicas[num]) || []).length || 1; });
     $('printCount').textContent = totalLabels;
     $('btnPrint').disabled = (n === 0);
   }
@@ -772,9 +777,10 @@
   // Rotas do ciclo CHP (ex.: "X1_CHP") nunca levam carro/agência impressos —
   // fica em branco de propósito. Isso só aparece dentro do ciclo AM.
   function isChpRoute(g) { return /CHP/i.test(g.fullName || g.name || ''); }
-  // Se uma saca do sistema tem mais de uma saca física (state.fisicas[num]),
-  // gera uma etiqueta por saca física (serial "NUM-A", "NUM-B"…), todas com
-  // o mesmo QR oficial — o serial é só pra controle interno impresso.
+  // Se uma saca do sistema tem mais de uma saca física (state.fisicas[num] =
+  // lista de seriais únicos, do contador global que nunca reseta), gera uma
+  // etiqueta por saca física (serial "NUM-SERIAL", ex. "1-7"), todas com o
+  // mesmo QR oficial — o serial é só pra controle interno impresso.
   function selectedItems() {
     var numToGroup = {}; state.groups.forEach(function (g) { (g.realSacas || []).forEach(function (n) { numToGroup[n] = g; }); });
     var out = [];
@@ -782,11 +788,11 @@
       var g = numToGroup[num]; if (!g) return;
       var m = state.metaByNum[num] || {};
       var chp = isChpRoute(g);
-      var count = (state.fisicas && state.fisicas[num]) || 1;
-      for (var i = 0; i < count; i++) {
-        var serial = count > 1 ? (num + '-' + String.fromCharCode(65 + i)) : String(num);
+      var serials = (state.fisicas && state.fisicas[num]) || [];
+      var list = serials.length ? serials.map(function (sn) { return num + '-' + sn; }) : [String(num)];
+      list.forEach(function (serial) {
         out.push({ num: num, serial: serial, route: g.name, agencia: chp ? '' : (m.agencia || ''), modal: chp ? '' : (m.veiculo || ''), qr: state.qrByNum[num] || '', chp: chp });
-      }
+      });
     });
     return out;
   }
@@ -861,7 +867,7 @@
     var now = new Date().toISOString();
     var payload = { items: items.map(function (it) {
       return { timestamp: now, saca: it.num, serial: it.serial, rota: it.route,
-        agencia: it.chp ? '' : it.agencia, qtd_fisicas: (state.fisicas && state.fisicas[it.num]) || 1 };
+        agencia: it.chp ? '' : it.agencia, qtd_fisicas: ((state.fisicas && state.fisicas[it.num]) || []).length || 1 };
     }) };
     fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       .then(function (res) { if (!res.ok) throw new Error('HTTP ' + res.status); lastLogError = ''; })
@@ -900,7 +906,11 @@
   function openRenum(groupName, idx, oldNum) {
     renumTarget = { groupName: groupName, idx: idx, oldNum: oldNum };
     $('renumInput').value = oldNum;
-    $('renumFisicas').value = (state.fisicas && state.fisicas[oldNum]) || 1;
+    $('renumFisicas').value = ((state.fisicas && state.fisicas[oldNum]) || []).length || 1;
+    var serials = (state.fisicas && state.fisicas[oldNum]) || [];
+    $('renumFisicasHint').textContent = serials.length
+      ? (state.lang === 'pt' ? 'Seriais atribuídos: ' : 'Seriales asignados: ') + serials.map(function (sn) { return oldNum + '-' + sn; }).join(', ')
+      : '';
     $('renumOverlay').classList.add('open');
     $('renumInput').focus();
   }
@@ -908,13 +918,15 @@
     if (!renumTarget) return;
     var oldNum = renumTarget.oldNum;
     var newNum = parseInt($('renumInput').value, 10);
-    var fisicas = parseInt($('renumFisicas').value, 10);
-    if (isNaN(fisicas) || fisicas < 1) fisicas = 1;
+    var wantCount = parseInt($('renumFisicas').value, 10);
+    if (isNaN(wantCount) || wantCount < 1) wantCount = 1;
     if (isNaN(newNum) || newNum <= 0) { toast(t('renum_invalid'), false); return; }
 
     var g = state.groups.filter(function (x) { return x.name === renumTarget.groupName; })[0];
     if (!g) return;
     if (!state.fisicas) state.fisicas = {};
+    if (!state.serialCounter) state.serialCounter = 1;
+    var serials = (state.fisicas[oldNum] || []).slice(); // captura antes de qualquer delete abaixo
 
     if (newNum !== oldNum) {
       if (RESERVED_NUMS.indexOf(newNum) !== -1) { toast(t('renum_reserved'), false); return; }
@@ -943,8 +955,16 @@
       delete state.fisicas[oldNum];
     }
 
-    if (!state.fisicas) state.fisicas = {};
-    if (fisicas > 1) state.fisicas[newNum] = fisicas; else delete state.fisicas[newNum];
+    // Ajusta a quantidade de seriais físicos pro número final. Seriais já
+    // atribuídos NUNCA mudam nem são reaproveitados — cada saca física
+    // recebe um número do contador global, que só cresce, nunca reseta.
+    if (wantCount <= 1) {
+      delete state.fisicas[newNum];
+    } else {
+      while (serials.length < wantCount) serials.push(state.serialCounter++);
+      if (serials.length > wantCount) serials = serials.slice(0, wantCount);
+      state.fisicas[newNum] = serials;
+    }
 
     renumTarget = null;
     persist(); render();

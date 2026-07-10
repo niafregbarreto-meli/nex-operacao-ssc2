@@ -122,7 +122,8 @@
       <div class="field"><label data-i18n="renum_label">Número</label><input type="number" id="renumInput" min="1" step="1"></div>
       <p class="hint" data-i18n="renum_hint">Use só se o número físico da saca estiver diferente do que o sistema atribuiu.</p>
       <div class="field"><label data-i18n="fisicas_label">Quantidade de sacas físicas</label><input type="number" id="renumFisicas" min="1" step="1" value="1"></div>
-      <p class="hint" data-i18n="fisicas_hint">Se essa saca do sistema corresponde a mais de uma saca física, a impressão gera uma etiqueta por saca física (1-A, 1-B…), todas com o mesmo QR.</p>
+      <p class="hint" data-i18n="fisicas_hint">Se essa saca do sistema corresponde a mais de uma saca física, cada uma recebe um serial único (nunca se repete, nem em outro dia) e a impressão gera uma etiqueta por saca física — todas com o mesmo QR.</p>
+      <p class="hint" id="renumFisicasHint" style="font-weight:700"></p>
     </div>
     <div class="modal-foot"><button class="btn ghost" id="cancelRenum" data-i18n="cancel">Cancelar</button><button class="btn loud" id="saveRenum" data-i18n="save">Salvar</button></div>
   </div>
