@@ -408,13 +408,31 @@ table.data tbody tr:hover { background: var(--andes-blue-bg); }
   .leste .rt { grid-area: 3/1/4/2; border-right: 2px solid #000; border-bottom: 2px solid #000; }
   .leste .md { grid-area: 4/1/6/2; border-right: 2px solid #000; }
 
-  /* ===== ETIQUETA: tamanho configurável, QR + 4 linhas ===== */
-  .etq { display: flex; page-break-after: always; box-sizing: border-box; background: #fff; align-items: stretch; }
-  .etq:last-child { page-break-after: auto; }
-  .etq .qr { display: flex; align-items: center; justify-content: center; }
-  .etq .qr svg { width: 100%; height: 100%; }
-  .etq .lines { flex: 1; display: flex; flex-direction: column; justify-content: space-between; padding-left: 4mm; }
-  .etq .ln { display: flex; align-items: baseline; font: 900 var(--etq-fs) 'Arial Black', Arial, sans-serif;
-    text-transform: uppercase; white-space: nowrap; overflow: hidden; line-height: 1; }
-  .etq .ln .k { font: 700 calc(var(--etq-fs) * .62) Arial, sans-serif; margin-right: 6px; }
+  /* ===== ETIQUETA: modelo das lideranças — rota filha/QR, rota mãe, agência, saca física ===== */
+  .etq2-wrap { page-break-after: always; text-align: center; }
+  .etq2-wrap:last-child { page-break-after: auto; }
+  .etq2 {
+    display: flex; flex-direction: column; margin: 0 auto; box-sizing: border-box;
+    border: 2px solid #000; border-radius: 8px; overflow: hidden; background: #fff;
+  }
+  .etq2 .row { display: flex; align-items: stretch; border-bottom: 2px solid #000; overflow: hidden; }
+  .etq2 .row:last-child { border-bottom: none; }
+  .etq2 .lbl {
+    width: 36%; flex: none; display: flex; align-items: center; padding-left: 2mm; padding-right: 1mm;
+    font: 700 7.5pt Arial, sans-serif; text-transform: uppercase; border-right: 2px solid #000; line-height: 1.05;
+  }
+  .etq2 .val { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; gap: 3mm; padding: 0 2mm; }
+  .etq2 .row.filha { flex: 1.4; }
+  .etq2 .row.qrrow { flex: 3; }
+  .etq2 .row.mae { flex: .9; }
+  .etq2 .row.ag { flex: .9; }
+  .etq2 .row.saca { flex: 1.2; }
+  .etq2 .row.mae .val { background: #000 !important; }
+  .etq2 .val h1 { margin: 0; font: 900 52pt 'Arial Black', Arial, sans-serif; line-height: .85; }
+  .etq2 .val h2 { margin: 0; font: 900 20pt 'Arial Black', Arial, sans-serif; text-transform: uppercase; }
+  .etq2 .row.mae .val h2 { color: #fff; }
+  .etq2 .qr-big svg { width: 32mm; height: 32mm; }
+  .etq2 .ntotal { font: 900 15pt 'Arial Black', Arial, sans-serif; white-space: nowrap; }
+  .etq2 .qr-small svg { width: 12mm; height: 12mm; }
+  .etq2-footer { margin-top: 2mm; font: 10pt 'Courier New', monospace; }
 }
