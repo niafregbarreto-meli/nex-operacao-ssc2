@@ -158,6 +158,12 @@ body {
   white-space: nowrap; line-height: 1.4;
 }
 .active-file .chip-btn:hover { background: var(--andes-blue); color: #fff; }
+.active-file .chip-x {
+  border: none; background: var(--error-bg); color: var(--error);
+  width: 20px; height: 20px; border-radius: 999px; cursor: pointer; font-weight: 800;
+  display: flex; align-items: center; justify-content: center; line-height: 1; flex: none;
+}
+.active-file .chip-x:hover { background: var(--error); color: #fff; }
 
 /* ---------- Buttons ---------- */
 .btn {

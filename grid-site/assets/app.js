@@ -577,8 +577,12 @@
     toast(msg, filled > 0);
   }
 
+  // × no chip do arquivo ativo — descarta a otimização carregada e volta
+  // pra tela vazia, sem precisar passar por Configurações.
   function clearOptimization() {
-    state.source = null; state.groups = []; state.selection = []; state.excluded = []; state.optFileName = null;
+    state.source = null; state.groups = []; state.selection = []; state.excluded = []; state.renum = {};
+    state.optFileName = null; state.qrByNum = {}; state.metaByNum = {}; state.lastSave = null; state.lastSheetSync = null;
+    savedSession = null;
     persist(); render();
   }
   // Apaga tudo (otimização, seleção, QR, exclusões) — pra sair de um estado
@@ -850,9 +854,12 @@
 
     var g = state.groups.filter(function (x) { return x.name === renumTarget.groupName; })[0];
     if (!g) return;
-    // Só rejeita se o número já existir DENTRO da mesma rota — durante a
-    // edição é normal duas rotas terem temporariamente o mesmo número.
-    var taken = (g.realSacas || []).indexOf(newNum) !== -1;
+    // Rejeita se o número já existir em QUALQUER rota — seleção, QR e
+    // agência/modal são amarrados só ao número (não à rota), então duas
+    // sacas com o mesmo número ficam emaranhadas (selecionar uma seleciona
+    // as duas, etc.). Duplicidade nunca é segura aqui, nem temporariamente.
+    var taken = false;
+    state.groups.forEach(function (x) { if ((x.realSacas || []).indexOf(newNum) !== -1) taken = true; });
     if (taken) { toast(t('renum_taken'), false); return; }
     var idx = g.realSacas.indexOf(renumTarget.oldNum);
     if (idx === -1) return;
@@ -907,6 +914,7 @@
   document.addEventListener('DOMContentLoaded', function () {
     // Fluxo principal
     ['btnAnexar2', 'btnTrocarOtim'].forEach(function (id) { $(id).addEventListener('click', function () { chooseFile('opt'); }); });
+    $('btnClearOtim').addEventListener('click', clearOptimization);
     $('btnRecuperar2').addEventListener('click', restoreSaved);
 
     $('searchInput').addEventListener('input', renderRoutes);
