@@ -828,13 +828,15 @@
         var ch = items.slice(i, i + 4);
         html += '<div class="print-page"><div class="print-grid">';
         ch.forEach(function (it) {
-          html += '<div class="card-et"><div class="c-num"><h1>' + esc(it.num) + '</h1></div>' +
-            '<div class="c-route"><h2>' + esc(it.route) + '</h2></div>' +
+          html += '<div class="card-wrap"><div class="card-et"><div class="c-num"><h1>' + esc(it.num) + '</h1></div>' +
+            '<div class="c-route"><h2>' + esc(it.fullRoute) + '</h2></div>' +
             '<div class="c-field"><span>' + esc(it.chp ? '' : (it.agencia || '—')) + '</span></div>' +
-            '<div class="c-field"><span>' + esc(it.chp ? '' : (it.modal || '—')) + '</span></div>' +
-            '<div class="c-qr">' + makeQrSvg(it.qr) + '</div></div>';
+            '<div class="c-field c-saca"><span>' + esc(it.fisicaN) + ' ' + t('de').toUpperCase() + ' ' + esc(it.fisicaTotal) + '</span>' +
+            '<span class="qr-mini">' + makeQrSvg(it.qr) + '</span></div>' +
+            '<div class="c-qr">' + makeQrSvg(it.qr) + '</div></div>' +
+            '<div class="card-footer">' + esc(buildSerialCompound(it)) + '</div></div>';
         });
-        for (var j = ch.length; j < 4; j++) html += '<div class="card-et empty"></div>';
+        for (var j = ch.length; j < 4; j++) html += '<div class="card-wrap"><div class="card-et empty"></div></div>';
         html += '</div></div>';
       }
     } else if (fmt === 'folha') {
@@ -846,11 +848,12 @@
             '<div class="fcell num"><span class="rot f-num">' + esc(it.num) + '</span></div>' +
             '<div class="fcell qS">' + qr + '</div>' +
             '<div class="fcell ag"><span class="rot f-info">' + esc(it.chp ? '' : (it.agencia || '—')) + '</span></div>' +
-            '<div class="fcell rt f-gray"><span class="rot f-route">' + esc(it.route) + '</span></div>' +
-            '<div class="fcell md"><span class="rot f-info">' + esc(it.chp ? '' : (it.modal || '—')) + '</span></div>' +
+            '<div class="fcell rt f-gray"><span class="rot f-route">' + esc(it.fullRoute) + '</span></div>' +
+            '<div class="fcell md"><span class="rot f-info">' + esc(it.fisicaN) + ' ' + t('de').toUpperCase() + ' ' + esc(it.fisicaTotal) + '</span></div>' +
             '</div></div>';
         }
-        html += '<div class="folha-page">' + half('oeste') + half('leste') + '</div>';
+        html += '<div class="folha-wrap"><div class="folha-page">' + half('oeste') + half('leste') + '</div>' +
+          '<div class="folha-footer">' + esc(buildSerialCompound(it)) + '</div></div>';
       });
     } else { // etiqueta — modelo pedido pelas lideranças: rota filha/QR, rota mãe, agência, saca física
       var c = state.cfgEtq;
@@ -864,7 +867,7 @@
           '<div class="row ag"><div class="lbl">' + t('lbl_agencia') + '</div><div class="val"><h2>' + esc(it.chp ? '—' : (it.agencia || '—')) + '</h2></div></div>' +
           '<div class="row saca"><div class="lbl">' + t('lbl_saca') + '</div><div class="val">' +
             '<span class="ntotal">' + esc(it.fisicaN) + ' ' + t('de').toUpperCase() + ' ' + esc(it.fisicaTotal) + '</span>' +
-            '<span class="qr-small">' + makeQrSvg(it.qr) + '</span></div></div>' +
+            '<span class="qr-mini">' + makeQrSvg(it.qr) + '</span></div></div>' +
           '</div><div class="etq2-footer">' + esc(buildSerialCompound(it)) + '</div></div>';
       });
     }

@@ -376,25 +376,33 @@ table.data tbody tr:hover { background: var(--andes-blue-bg); }
   .print-page:last-child { page-break-after: auto; }
   canvas, img, svg { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
-  /* ===== CARTÃO 4x1: num / rota(cinza) / agência / modal / QR ===== */
+  /* ===== CARTÃO 4x1: rota filha / rota mãe(cinza) / agência / saca física / QR ===== */
   .print-grid { display: grid; grid-template-columns: 90mm 90mm; grid-template-rows: 130mm 130mm; gap: 10mm; }
-  .card-et { width: 90mm; height: 130mm; display: flex; flex-direction: column; overflow: hidden;
+  .card-wrap { width: 90mm; height: 130mm; display: flex; flex-direction: column; }
+  .card-et { width: 90mm; height: 122mm; display: flex; flex-direction: column; overflow: hidden;
     border: 3px solid #000; border-radius: 10px; background: #fff; }
-  .card-et.empty { border: none; }
-  .c-num { height: 42mm; display: flex; align-items: center; justify-content: center; border-bottom: 2px solid #000; }
-  .c-num h1 { font: 900 86pt 'Arial Black', Arial, sans-serif; margin: 0; line-height: .8; }
-  .c-route { height: 20mm; display: flex; align-items: center; justify-content: center; border-bottom: 2px solid #000;
+  .card-et.empty { border: none; height: 130mm; }
+  .card-footer { height: 8mm; display: flex; align-items: center; justify-content: center;
+    font: 9pt 'Courier New', monospace; }
+  .c-num { height: 38mm; display: flex; align-items: center; justify-content: center; border-bottom: 2px solid #000; }
+  .c-num h1 { font: 900 80pt 'Arial Black', Arial, sans-serif; margin: 0; line-height: .8; }
+  .c-route { height: 18mm; display: flex; align-items: center; justify-content: center; border-bottom: 2px solid #000;
     background: #e5e7eb !important; }
-  .c-route h2 { font: 900 46pt 'Arial Black', Arial, sans-serif; margin: 0; text-transform: uppercase; }
-  .c-field { height: 12mm; display: flex; align-items: center; justify-content: center; border-bottom: 2px solid #000; }
+  .c-route h2 { font: 900 34pt 'Arial Black', Arial, sans-serif; margin: 0; text-transform: uppercase; }
+  .c-field { height: 11mm; display: flex; align-items: center; justify-content: center; border-bottom: 2px solid #000; gap: 3mm; }
   .c-field span { font: 900 17pt 'Arial Black', Arial, sans-serif; text-transform: uppercase; white-space: nowrap; }
-  .c-qr { flex: 1; display: flex; align-items: center; justify-content: center; padding: 3mm; }
-  .c-qr svg { width: 40mm; height: 40mm; }
+  .c-saca { height: 15mm; }
+  .c-qr { flex: 1; display: flex; align-items: center; justify-content: center; padding: 2mm; }
+  .c-qr svg { width: 32mm; height: 32mm; }
+  .qr-mini svg { width: 11mm; height: 11mm; }
 
   /* ===== FOLHA 1x1: espelho dobrável ===== */
-  .folha-page { width: 210mm; height: 297mm; display: flex; page-break-after: always; }
-  .folha-page:last-child { page-break-after: auto; }
-  .quad { width: 105mm; height: 297mm; padding: 5mm; box-sizing: border-box; display: flex; }
+  .folha-wrap { width: 210mm; height: 297mm; display: flex; flex-direction: column; page-break-after: always; }
+  .folha-wrap:last-child { page-break-after: auto; }
+  .folha-page { flex: 1; display: flex; overflow: hidden; }
+  .folha-footer { height: 8mm; flex: none; display: flex; align-items: center; justify-content: center;
+    font: 9pt 'Courier New', monospace; }
+  .quad { width: 105mm; padding: 5mm; box-sizing: border-box; display: flex; }
   .quad.oeste { border-right: 1px dashed #999; }
   .fbox { flex: 1; border: 3px solid #000; border-radius: 14px; display: grid;
     grid-template-rows: 1fr .7fr 1.6fr .7fr 1fr; overflow: hidden; }
@@ -446,7 +454,7 @@ table.data tbody tr:hover { background: var(--andes-blue-bg); }
   .etq2 .row.mae .val h2 { color: #fff; }
   .etq2 .qr-big svg { width: 32mm; height: 32mm; }
   .etq2 .ntotal { font: 900 15pt 'Arial Black', Arial, sans-serif; white-space: nowrap; }
-  .etq2 .qr-small svg { width: 12mm; height: 12mm; }
+  .etq2 .qr-mini svg { width: 12mm; height: 12mm; }
   .etq2-footer { margin-top: 2mm; font: 10pt 'Courier New', monospace; }
 }
 
@@ -3832,13 +3840,15 @@ var qrcode = function() {
         var ch = items.slice(i, i + 4);
         html += '<div class="print-page"><div class="print-grid">';
         ch.forEach(function (it) {
-          html += '<div class="card-et"><div class="c-num"><h1>' + esc(it.num) + '</h1></div>' +
-            '<div class="c-route"><h2>' + esc(it.route) + '</h2></div>' +
+          html += '<div class="card-wrap"><div class="card-et"><div class="c-num"><h1>' + esc(it.num) + '</h1></div>' +
+            '<div class="c-route"><h2>' + esc(it.fullRoute) + '</h2></div>' +
             '<div class="c-field"><span>' + esc(it.chp ? '' : (it.agencia || '—')) + '</span></div>' +
-            '<div class="c-field"><span>' + esc(it.chp ? '' : (it.modal || '—')) + '</span></div>' +
-            '<div class="c-qr">' + makeQrSvg(it.qr) + '</div></div>';
+            '<div class="c-field c-saca"><span>' + esc(it.fisicaN) + ' ' + t('de').toUpperCase() + ' ' + esc(it.fisicaTotal) + '</span>' +
+            '<span class="qr-mini">' + makeQrSvg(it.qr) + '</span></div>' +
+            '<div class="c-qr">' + makeQrSvg(it.qr) + '</div></div>' +
+            '<div class="card-footer">' + esc(buildSerialCompound(it)) + '</div></div>';
         });
-        for (var j = ch.length; j < 4; j++) html += '<div class="card-et empty"></div>';
+        for (var j = ch.length; j < 4; j++) html += '<div class="card-wrap"><div class="card-et empty"></div></div>';
         html += '</div></div>';
       }
     } else if (fmt === 'folha') {
@@ -3850,11 +3860,12 @@ var qrcode = function() {
             '<div class="fcell num"><span class="rot f-num">' + esc(it.num) + '</span></div>' +
             '<div class="fcell qS">' + qr + '</div>' +
             '<div class="fcell ag"><span class="rot f-info">' + esc(it.chp ? '' : (it.agencia || '—')) + '</span></div>' +
-            '<div class="fcell rt f-gray"><span class="rot f-route">' + esc(it.route) + '</span></div>' +
-            '<div class="fcell md"><span class="rot f-info">' + esc(it.chp ? '' : (it.modal || '—')) + '</span></div>' +
+            '<div class="fcell rt f-gray"><span class="rot f-route">' + esc(it.fullRoute) + '</span></div>' +
+            '<div class="fcell md"><span class="rot f-info">' + esc(it.fisicaN) + ' ' + t('de').toUpperCase() + ' ' + esc(it.fisicaTotal) + '</span></div>' +
             '</div></div>';
         }
-        html += '<div class="folha-page">' + half('oeste') + half('leste') + '</div>';
+        html += '<div class="folha-wrap"><div class="folha-page">' + half('oeste') + half('leste') + '</div>' +
+          '<div class="folha-footer">' + esc(buildSerialCompound(it)) + '</div></div>';
       });
     } else { // etiqueta — modelo pedido pelas lideranças: rota filha/QR, rota mãe, agência, saca física
       var c = state.cfgEtq;
@@ -3868,7 +3879,7 @@ var qrcode = function() {
           '<div class="row ag"><div class="lbl">' + t('lbl_agencia') + '</div><div class="val"><h2>' + esc(it.chp ? '—' : (it.agencia || '—')) + '</h2></div></div>' +
           '<div class="row saca"><div class="lbl">' + t('lbl_saca') + '</div><div class="val">' +
             '<span class="ntotal">' + esc(it.fisicaN) + ' ' + t('de').toUpperCase() + ' ' + esc(it.fisicaTotal) + '</span>' +
-            '<span class="qr-small">' + makeQrSvg(it.qr) + '</span></div></div>' +
+            '<span class="qr-mini">' + makeQrSvg(it.qr) + '</span></div></div>' +
           '</div><div class="etq2-footer">' + esc(buildSerialCompound(it)) + '</div></div>';
       });
     }
