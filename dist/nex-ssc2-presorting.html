@@ -359,6 +359,12 @@ table.data tbody tr:hover { background: var(--andes-blue-bg); }
 /* ---------- Print ---------- */
 #print-area { display: none; }
 @media print {
+  /* Sem isso, o navegador não imprime NENHUMA cor de fundo por padrão (faixa
+     cinza do cartão/folha, faixa preta da etiqueta saem brancas/apagadas). */
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+  /* Isso também faria o fundo cinza claro do app (--bg, fora dos cartões)
+     ser impresso — força branco puro na página inteira antes do resto. */
+  html, body { background: #fff !important; }
   body * { visibility: hidden; }
   .app-header, main, .toast, .overlay { display: none !important; }
   #print-area { display: block !important; position: absolute; left: 0; top: 0; width: 100%; visibility: visible; }
